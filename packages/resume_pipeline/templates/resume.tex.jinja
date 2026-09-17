@@ -1,0 +1,100 @@
+<< preamble >>
+
+\begin{document}
+    \newcommand{\AND}{\unskip
+        \cleaders\copy\ANDbox\hskip\wd\ANDbox
+        \ignorespaces
+    }
+    \newsavebox\ANDbox
+    \sbox\ANDbox{$|$}
+
+    \begin{header}
+        \fontsize{25 pt}{25 pt}\selectfont << header.name >>
+
+        \vspace{5 pt}
+
+        \normalsize
+        \mbox{<< header.location >>}%
+        \kern 5.0 pt%
+        \AND%
+        \kern 5.0 pt%
+        \mbox{\hrefWithoutArrow{mailto:<< header.email >>}{<< header.email >>}}%
+        \kern 5.0 pt%
+        \AND%
+        \kern 5.0 pt%
+        \mbox{\hrefWithoutArrow{tel:<< header.phone_href >>}{<< header.phone_display >>}}%
+        \kern 5.0 pt%
+        \AND%
+        \kern 5.0 pt%
+        \mbox{\hrefWithoutArrow{https://<< header.linkedin >>}{<< header.linkedin >>}}%
+        \kern 5.0 pt%
+    \end{header}
+
+    \vspace{5 pt - 0.3 cm}
+
+<% for section in sections %>
+    \section{<< section.title >>}
+<% if section.key == 'education' %>
+<% for entry in section.entries %>
+<% if entry.spacing_before %>
+        \vspace{<< entry.spacing_before >>}
+<% endif %>
+        \begin{twocolentry}{
+            << entry.dates >>
+        }
+            \textbf{<< entry.organization >>}, << entry.title >><% if entry.title_suffix %><< entry.title_suffix >><% endif %>\end{twocolentry}
+
+        \vspace{<< entry.spacing_after_header >>}
+        \begin{onecolentry}
+            \begin{highlights}
+<% for bullet in entry.bullets %>
+                \item << bullet.text >><% if bullet.tech %> \textit{<< bullet.tech >>}<% endif %>
+
+<% endfor %>
+            \end{highlights}
+        \end{onecolentry}
+<% if entry.spacing_after %>
+        \vspace{<< entry.spacing_after >>}
+<% endif %>
+<% endfor %>
+<% elif section.key == 'skills' %>
+        \begin{onecolentry}
+            \begin{highlightsforbulletentries}
+<% for line in section.lines %>
+            \item << line.text >>
+<% endfor %>
+            \end{highlightsforbulletentries}
+        \end{onecolentry}
+<% elif section.key == 'experience' %>
+<% for entry in section.entries %>
+<% if entry.spacing_before %>
+        \vspace{<< entry.spacing_before >>}
+<% endif %>
+        \begin{twocolentry}{
+            << entry.dates >>
+        }
+            \textbf{<< entry.organization >>}, << entry.title >>\end{twocolentry}
+
+        \vspace{<< entry.spacing_after_header >>}
+        \begin{onecolentry}
+            \begin{highlights}
+<% for bullet in entry.bullets %>
+                \item << bullet.text >><% if bullet.tech %> \textit{<< bullet.tech >>}<% endif %>
+
+<% endfor %>
+            \end{highlights}
+        \end{onecolentry}
+<% if entry.spacing_after %>
+        \vspace{<< entry.spacing_after >>}
+<% endif %>
+<% endfor %>
+<% elif section.key == 'projects' %>
+        \begin{highlights}
+<% for project in section.projects %>
+            \item << project.text >><% if project.tech %> \textit{<< project.tech >>}<% endif %>
+
+<% endfor %>
+        \end{highlights}
+<% endif %>
+<% endfor %>
+\end{document}

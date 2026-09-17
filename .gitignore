@@ -1,0 +1,16 @@
+.env
+.claude/settings.local.json
+*.aux
+*.log
+*.pdf
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+packages/resume_pipeline/out/
+packages/resume_pipeline/jobs/

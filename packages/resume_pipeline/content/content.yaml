@@ -1,0 +1,538 @@
+header:
+  name: Curtis Welter
+  location: Atlanta, GA 30316
+  email: weltercurtis@gmail.com
+  phone_display: "678 382 4977"
+  phone_href: "+1-678-382-4977"
+  linkedin: linkedin.com/in/curtis-welter
+  last_updated: September 2024
+education:
+- id: edu-gt-ms
+  organization: Georgia Institute of Technology
+  title: MS in Computer Science
+  title_suffix: "-Expected Graduation 2028"
+  dates: "01/2026 – Present"
+  tags:
+  - education
+  - graduate
+  - robotics
+  - machine-learning
+  - computer-graphics
+  priority: 90
+  pinned: true
+  spacing_after_header: 0.10 cm
+  spacing_after: 0.20 cm
+  bullets:
+  - id: edu-gt-ms-b1
+    text: "\\textbf{Coursework:} Operating Systems, Cognitive Science, AI Techniques in Robotics, Computer Graphics"
+    tags:
+    - coursework
+    - operating-systems
+    - robotics
+    - ai
+    - computer-graphics
+    priority: 75
+    pinned: false
+    summary: "MS coursework in OS, cognitive science, robotics AI, and computer graphics"
+  - id: edu-gt-ms-b2
+    text: "Specialization in Computational Perception and Robotics"
+    tags:
+    - robotics
+    - perception
+    - specialization
+    priority: 70
+    pinned: false
+    summary: "Specialization in Computational Perception and Robotics"
+  summary: "Georgia Tech MS in Computer Science, Computational Perception and Robotics specialization"
+- id: edu-gt-bs
+  organization: Georgia Institute of Technology
+  title: BS in Computer Science
+  dates: "08/2018 – 05/2022"
+  tags:
+  - education
+  - undergraduate
+  - security
+  - nlp
+  - computer-vision
+  - machine-learning
+  priority: 85
+  pinned: true
+  spacing_after_header: 0.10 cm
+  bullets:
+  - id: edu-gt-bs-b1
+    text: "\\textbf{Coursework:} Computer Systems \\& Networks, Information Security, Natural Language Processing, Computer Vision, Machine Learning, Artificial Intelligence and Robotics"
+    tags:
+    - coursework
+    - security
+    - nlp
+    - computer-vision
+    - machine-learning
+    - ai
+    - robotics
+    priority: 80
+    pinned: false
+    summary: "BS coursework spanning systems, security, NLP, CV, ML, and robotics"
+  - id: edu-gt-bs-b2
+    text: "Studied Abroad Summer 2019 at Barcelona School of Informatics"
+    tags:
+    - study-abroad
+    - international
+    priority: 40
+    pinned: false
+    summary: "Study abroad at Barcelona School of Informatics"
+  summary: "Georgia Tech BS in Computer Science with ML, CV, NLP, and security coursework"
+skills:
+- id: skills-languages
+  text: "Python, Java, C++, C\\#, Kotlin, Swift, Javascript, C, R, MATLAB, Microsoft SQL Server, Assembly"
+  tags:
+  - python
+  - java
+  - cpp
+  - csharp
+  - kotlin
+  - swift
+  - javascript
+  - sql
+  - languages
+  priority: 90
+  pinned: true
+  summary: "Programming languages including Python, Java, C++, C#, Kotlin, Swift, JavaScript, SQL"
+- id: skills-frameworks
+  text: "React Native, Angular; Azure, .NET, AWS, GCP; UNIX/Linux, Android, iOS; Git, Docker; PyTorch; LaTeX;"
+  tags:
+  - react-native
+  - angular
+  - azure
+  - dotnet
+  - aws
+  - gcp
+  - linux
+  - android
+  - ios
+  - git
+  - docker
+  - pytorch
+  - ai
+  - ml
+  - fullstack
+  - section-508
+  - accessibility
+  priority: 85
+  pinned: true
+  summary: "Frameworks and platforms including React Native, Angular, cloud, mobile, and AI/ML tools"
+- id: skills-creative
+  text: "Adobe Photoshop, Premiere, After Effects, Illustrator; Blender; Unreal Engine, Unity, Godot; Fusion 360;"
+  tags:
+  - creative
+  - game-dev
+  - 3d
+  - design
+  priority: 30
+  pinned: false
+  summary: "Creative and game development tools including Adobe suite, Blender, and game engines"
+experience:
+- id: exp-cdc
+  organization: Centers for Disease Control and Prevention
+  title: Full Stack Engineer
+  dates: "11/2023 - 03/2026"
+  tags:
+  - fullstack
+  - python
+  - java
+  - healthcare
+  - ml
+  - data-pipeline
+  - mobile
+  - security
+  - sql
+  priority: 100
+  pinned: true
+  spacing_before: 0.05 cm
+  spacing_after_header: 0.10 cm
+  spacing_after: 0.2 cm
+  bullets:
+  - id: exp-cdc-b1
+    text: "Year 2 was spent on the New Data Source Development Team in support of the National Syndromic Surveillance Program. Created and maintained pipelines for the intake, analysis, and visualization of Public Health Data from a variety of sources to monitor and predict national health emergencies. Developed AI enabled python and java scripts to sanitize and prepare data for entry into SQL databases."
+    tech: "Python, Java, MS SQL"
+    tags:
+    - python
+    - java
+    - sql
+    - ml
+    - data-pipeline
+    - healthcare
+    - big-data
+    - visualization
+    priority: 98
+    pinned: true
+    summary: "Syndromic surveillance data pipelines with AI-enabled Python/Java ETL"
+  - id: exp-cdc-b2
+    text: "Previously worked in support of the National Center for Chronic Disease Prevention and Health Promotion's Cancer profiling and screening app, added new functionality and security features to protect and validate user data."
+    tech: "Kotlin, .NET, C\\#, MySQL, Swift"
+    tags:
+    - mobile
+    - kotlin
+    - dotnet
+    - csharp
+    - mysql
+    - swift
+    - security
+    - healthcare
+    priority: 92
+    pinned: false
+    summary: "Cancer profiling mobile app with security and data validation features"
+  - id: exp-cdc-b3
+    text: "Additionally was responsible for maintaining and developing a variety of mobile and web apps on both Android and iOS in a variety of frameworks, all subject to section 508 compliance for accessibility regulations."
+    tech: "Kotlin, Swift, Ionic, Javascript, .NET"
+    tags:
+    - mobile
+    - android
+    - ios
+    - accessibility
+    - section-508
+    - web
+    priority: 88
+    pinned: false
+    summary: "Cross-platform mobile/web apps with Section 508 accessibility compliance"
+  summary: "Full stack developer at CDC on syndromic surveillance and mobile health apps"
+- id: exp-novarata
+  organization: Novarata
+  title: Full Stack Developer
+  dates: "03/2023 - 09/2023"
+  tags:
+  - fullstack
+  - android
+  - embedded
+  - angular
+  - dotnet
+  - erp
+  - crm
+  priority: 74
+  pinned: false
+  spacing_after_header: 0.1 cm
+  spacing_after: 0.2 cm
+  bullets:
+  - id: exp-novarata-b1
+    text: "Assisted in development of kernel level android driver for smart watch's network radio, increasing battery life of device from 20 to 50 hours."
+    tech: "Java and C"
+    tags:
+    - android
+    - embedded
+    - java
+    - c
+    - kernel
+    - performance
+    priority: 76
+    pinned: false
+    summary: "Kernel-level Android driver improving smartwatch battery life 20 to 50 hours"
+  - id: exp-novarata-b2
+    text: "Added new features to client company's in house industrial ERP and CRM systems. Added features to frontend to allow for more customizable quotes, and resolved email API bugs."
+    tech: "Angular, C\\#, .NET, and MS SQL"
+    tags:
+    - angular
+    - csharp
+    - dotnet
+    - sql
+    - erp
+    - crm
+    - frontend
+    - api
+    priority: 70
+    pinned: false
+    summary: "ERP/CRM feature development and email API bug fixes with Angular and .NET"
+  summary: "Full stack developer at Novarata on Android drivers and ERP/CRM systems"
+- id: exp-equifax
+  organization: Equifax
+  title: Quality Engineer
+  dates: "07/2022 - 01/2023"
+  tags:
+  - qa
+  - testing
+  - java
+  - karate
+  - cucumber
+  - rest-api
+  - devops
+  priority: 58
+  pinned: false
+  spacing_after_header: 0.1 cm
+  spacing_after: 0.2 cm
+  bullets:
+  - id: exp-equifax-b1
+    text: "Updated and maintained automated testing scripts using the Java frameworks Karate and Cucumber, including the creation of new test cases."
+    tech: "Java, Karate, Cucumber"
+    tags:
+    - java
+    - testing
+    - automation
+    - karate
+    - cucumber
+    priority: 58
+    pinned: false
+    summary: "Automated test maintenance with Karate and Cucumber"
+  - id: exp-equifax-b2
+    text: "Manually tested and filed bug reports for various government service REST endpoints."
+    tech: "REST API"
+    tags:
+    - testing
+    - rest-api
+    - qa
+    - government
+    priority: 55
+    pinned: false
+    summary: "Manual REST API testing and bug reporting for government services"
+  - id: exp-equifax-b3
+    text: "Provided on call support during production deployments of live services."
+    tags:
+    - devops
+    - on-call
+    - production
+    - deployment
+    priority: 53
+    pinned: false
+    summary: "On-call production deployment support"
+  summary: "Quality engineer maintaining automated tests and REST API validation at Equifax"
+- id: exp-gtri
+  organization: Georgia Tech Research Institute
+  title: Research Assistant
+  dates: "01/2020 - 05/2022"
+  tags:
+  - research
+  - security
+  - nlp
+  - computer-vision
+  - python
+  - cpp
+  - dod
+  priority: 80
+  pinned: false
+  spacing_after_header: 0.1 cm
+  spacing_after: 0.2 cm
+  bullets:
+  - id: exp-gtri-b1
+    text: "Conducted guided research on security vulnerabilities within Intel C++ Compiler's Parallel Processing Optimization. Authored section of official threat assessment report detailing findings in accordance with NIST standard."
+    tech: "C++"
+    tags:
+    - security
+    - cpp
+    - nist
+    - research
+    - compiler
+    priority: 82
+    pinned: false
+    summary: "Security research on Intel C++ compiler vulnerabilities per NIST standards"
+  - id: exp-gtri-b2
+    text: "Developed document analysis utility on contract with the Department of Defense utilizing Computer Vision and Natural Language Processing techniques."
+    tech: "Python"
+    tags:
+    - python
+    - computer-vision
+    - nlp
+    - dod
+    - document-analysis
+    priority: 85
+    pinned: false
+    summary: "DoD document analysis utility using computer vision and NLP"
+  - id: exp-gtri-b3
+    text: "Assisted in development of a naval ship tracking and networking system. Created python utility to parse, normalize, and visualize location data reported by a variety of seafaring vessels."
+    tech: "Python"
+    tags:
+    - python
+    - data-visualization
+    - networking
+    - parsing
+    priority: 70
+    pinned: false
+    summary: "Naval ship tracking system with Python data parsing and visualization"
+  summary: "Research assistant at GTRI on security, NLP/CV, and naval tracking systems"
+- id: exp-cockydoodle
+  organization: CockyDoodle Inc.
+  title: Android/iOS Developer
+  dates: "09/2018 - 05/2019"
+  tags:
+  - mobile
+  - android
+  - ios
+  - sql
+  - json
+  - startup
+  priority: 68
+  pinned: false
+  spacing_after_header: 0.1 cm
+  spacing_after: 0.2 cm
+  bullets:
+  - id: exp-cockydoodle-b1
+    text: "Developed native versions of startup company's prototype app on both iOS and Android."
+    tech: "Swift, Kotlin"
+    tags:
+    - mobile
+    - android
+    - ios
+    - native
+    priority: 67
+    pinned: false
+    summary: "Native iOS and Android prototype app development"
+  - id: exp-cockydoodle-b2
+    text: "Handled queries to SQL database to dynamically update app data through JSON objects."
+    tech: "SQL, JSON"
+    tags:
+    - sql
+    - json
+    - mobile
+    - backend
+    priority: 65
+    pinned: false
+    summary: "SQL-backed dynamic app data via JSON"
+  summary: "Native iOS and Android developer for startup prototype app"
+- id: exp-pineapple-labs
+  organization: Pineapple Labs
+  title: Founder
+  dates: "08/2016 - 01/2019"
+  tags:
+  - founder
+  - mobile
+  - android
+  - game-dev
+  - 3d-printing
+  - startup
+  priority: 48
+  pinned: false
+  spacing_after_header: 0.1 cm
+  spacing_after: 0.2 cm
+  bullets:
+  - id: exp-pineapple-b1
+    text: "Front and backend developer on Android applications and games."
+    tech: "Java, Android"
+    tags:
+    - android
+    - mobile
+    - fullstack
+    priority: 52
+    pinned: false
+    summary: "Full stack Android app and game development"
+  - id: exp-pineapple-b2
+    text: "Released mobile phone business management and simulation game. Single developer, gained over 10,000 downloads post launch."
+    tech: "Android, Java"
+    tags:
+    - mobile
+    - game-dev
+    - android
+    - indie
+    priority: 50
+    pinned: false
+    summary: "Solo-developed Android game with 10,000+ downloads"
+  - id: exp-pineapple-b3
+    text: "Providing online 3D printing services with custom built 3D printers."
+    tags:
+    - 3d-printing
+    - hardware
+    - maker
+    priority: 44
+    pinned: false
+    summary: "Custom 3D printer build and online printing services"
+  - id: exp-pineapple-b4
+    text: "Creating free online tutorials and instructional content on website."
+    tags:
+    - technical-writing
+    - education
+    - web
+    priority: 40
+    pinned: false
+    summary: "Technical tutorials and instructional web content"
+  summary: "Founder of Pineapple Labs mobile apps, games, and 3D printing services"
+- id: exp-superior-flow
+  organization: Superior Flow Solutions
+  title: IT/Web Developer
+  dates: "11/2017 - 07/2018"
+  tags:
+  - web
+  - frontend
+  - crm
+  - automation
+  priority: 58
+  pinned: false
+  spacing_after_header: 0.1 cm
+  spacing_after: 0.2 cm
+  bullets:
+  - id: exp-superior-flow-b1
+    text: "Frontend web development and website design."
+    tags:
+    - web
+    - frontend
+    - design
+    priority: 57
+    pinned: false
+    summary: "Frontend web development and website design"
+  - id: exp-superior-flow-b2
+    text: "Automating and designing document processing/formats for Customer Relationship Management software"
+    tags:
+    - crm
+    - automation
+    - documents
+    priority: 56
+    pinned: false
+    summary: "CRM document processing automation and format design"
+  summary: "Web developer and CRM document automation at Superior Flow Solutions"
+projects:
+- id: proj-read-a-rhyme
+  text: "\\textbf{Read-A-Rhyme} (2022) Capstone project developing a mobile app to teach literacy to elementary school children using nursery rhymes. Project team of 5 in coordination with early literacy researchers at our client Hearatale."
+  tech: "React Native"
+  tags:
+  - mobile
+  - react-native
+  - capstone
+  - education
+  priority: 70
+  pinned: false
+  summary: "Capstone mobile literacy app built with React Native for Hearatale"
+- id: proj-peach-robot
+  text: "\\textbf{Peach Picking Robot} (2021) Joined a team in Georgia Tech's VIP program to develop an agricultural robot. Implemented computer vision for ripe peach detection and a denoising algorithm for LiDAR navigation."
+  tech: "Python, C++"
+  tags:
+  - robotics
+  - computer-vision
+  - lidar
+  - python
+  - cpp
+  - agriculture
+  priority: 75
+  pinned: false
+  summary: "Agricultural robot with computer vision and LiDAR navigation"
+- id: proj-moog-hackathon
+  text: "\\textbf{Moog Hackathon} (2020) Soldered and programmed arduino based microcontroller to augment the capabilities of a Moog 'Werkstatt' Analog Synthesizer musical instrument, adding MIDI keyboard support."
+  tech: "C (language)"
+  tags:
+  - embedded
+  - arduino
+  - c
+  - hardware
+  - midi
+  priority: 60
+  pinned: false
+  summary: "Arduino MIDI augmentation for Moog synthesizer at hackathon"
+- id: proj-hackgt
+  text: "\\textbf{HackGT Hackathon} (2018-2019) 2 year participant. 1st year my team built an app which identifies comic book characters using machine learning and cloud based computing. 2nd Year won award for Best Use of Google Cloud API for litter tracking and cleanup app with Google Maps and Vision integration."
+  tech: "Android, Java, Kotlin"
+  tags:
+  - hackathon
+  - machine-learning
+  - android
+  - java
+  - kotlin
+  - gcp
+  - google-cloud
+  priority: 65
+  pinned: false
+  summary: "HackGT projects including ML comic character ID and Google Cloud litter tracking app"
+- id: proj-ludum-dare
+  text: "\\textbf{Ludum Dare Game Jam} (2014-Present) Regular participant in game jams as part of a team and as a solo developer. Current platform NES/Gameboy Homebrew."
+  tech: "Actionscript 3/Flash, C\\#, Unity, C++, Unreal Engine, Assembly"
+  tags:
+  - game-dev
+  - unity
+  - unreal
+  - assembly
+  - homebrew
+  priority: 70
+  pinned: false
+  summary: "Long-running game jam participation across multiple engines and platforms"

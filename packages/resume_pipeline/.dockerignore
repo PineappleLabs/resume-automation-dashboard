@@ -1,0 +1,10 @@
+jobs/
+out/
+tests/
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+main.tex
+main.pdf
+Profile.pdf
