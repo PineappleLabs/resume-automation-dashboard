@@ -27,6 +27,7 @@ class SyncStats:
     prefiltered: int = 0
     classified: int = 0
     leads_created: int = 0
+    filtered_by_location: int = 0
 
 
 def _get_cursor(db: Session) -> int | None:
@@ -191,12 +192,17 @@ def _process_message(db: Session, service, ref: dict, threshold: float, stats: S
             direction="inbound",
             classification="job_lead" if result.is_job_lead else "not_job_lead",
             classification_confidence=result.confidence,
+            location=result.location,
+            location_ok=result.location_ok,
         )
     )
     stats.classified += 1
     if result.is_job_lead and result.confidence >= threshold:
-        _upsert_lead(db, thread, result, from_addr, body_text, received_at)
-        stats.leads_created += 1
+        if result.location_ok:
+            _upsert_lead(db, thread, result, from_addr, body_text, received_at)
+            stats.leads_created += 1
+        else:
+            stats.filtered_by_location += 1
 
 
 def run_once(

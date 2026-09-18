@@ -161,6 +161,8 @@ class EmailMessage(Base):
     direction: Mapped[str] = mapped_column(String(20), nullable=False, default="inbound")
     classification: Mapped[str | None] = mapped_column(String(20))
     classification_confidence: Mapped[float | None] = mapped_column()
+    location: Mapped[str | None] = mapped_column(String(255))
+    location_ok: Mapped[bool | None] = mapped_column()
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now(), nullable=False)
 
     thread: Mapped["EmailThread"] = relationship(back_populates="messages")

@@ -109,6 +109,8 @@ def counting_classify(monkeypatch):
             is_job_lead=True,
             company="Acme Corp",
             role_title="Backend Engineer",
+            location="Atlanta, GA",
+            location_ok=True,
             confidence=0.9,
             reason="Recruiter outreach.",
         )
@@ -213,6 +215,47 @@ def test_below_threshold_confidence_does_not_create_lead(db, monkeypatch):
     email_message = db.execute(select(EmailMessage)).scalar_one()
     assert email_message.classification == "job_lead"
     assert email_message.classification_confidence == 0.3
+
+
+def test_location_mismatch_does_not_create_lead(db, monkeypatch):
+    msg = _make_full_message(
+        "m1",
+        "t1",
+        100,
+        "Great opportunity in Iowa",
+        "recruiter@steneral.com",
+        "Onsite role in Des Moines, IA.",
+    )
+    messages = _FakeMessagesResource({"m1": msg}, {"messages": [{"id": "m1"}]})
+    history = _FakeHistoryResource({"history": []})
+    monkeypatch.setattr(
+        sync_module, "get_gmail_service", lambda: _FakeGmailService(messages, history)
+    )
+    monkeypatch.setattr(
+        sync_module,
+        "classify_email",
+        lambda **kwargs: EmailClassification(
+            is_job_lead=True,
+            company="Steneral Consulting",
+            role_title="Embedded Software Engineer",
+            location="Des Moines, IA -- Onsite",
+            location_ok=False,
+            confidence=0.95,
+            reason="Real lead, but onsite outside the target area.",
+        ),
+    )
+
+    stats = sync_module.run_once()
+
+    assert stats.classified == 1
+    assert stats.leads_created == 0
+    assert stats.filtered_by_location == 1
+    assert db.execute(select(Lead)).scalar_one_or_none() is None
+
+    email_message = db.execute(select(EmailMessage)).scalar_one()
+    assert email_message.classification == "job_lead"
+    assert email_message.location == "Des Moines, IA -- Onsite"
+    assert email_message.location_ok is False
 
 
 def test_expired_history_cursor_falls_back_to_full_resync(db, monkeypatch, counting_classify):

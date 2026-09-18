@@ -125,14 +125,15 @@ PDFs/artifacts stay on disk under `/data/jobs/<slug>/...` (matching today's pipe
   - Verified: 7-test pytest suite passing; Dockerfile built and run on `bigpineapple` over SSH with Tectonic 0.17.0 (required adding `libgraphite2-3` — the prebuilt binary needs it and fails silently otherwise); container output confirmed byte-identical to host output (only CRLF/LF difference).
   - Re-verified locally on Windows (2026-09-17): Python 3.12 venv, `pip install -e ".[dev]"`, native `tectonic-0.17.0-x86_64-pc-windows-msvc` installed to `%LOCALAPPDATA%\tectonic\`; 7-test pytest suite passes; `python -m resume_pipeline.cli master` and `verify-ats` run end-to-end with no Docker involved. This is now the primary dev loop for every later phase — Docker/homelab stays the deployment target, not the dev target.
   - Repo pushed to [github.com/PineappleLabs/resume-automation-dashboard](https://github.com/PineappleLabs/resume-automation-dashboard).
-- **Phase 1 — Gmail ingestion + dashboard. 🟢 Built; one manual step left before it's proven end-to-end.**
+- **Phase 1 — Gmail ingestion + dashboard. 🟢 Done and verified against the real mailbox.**
   Postgres + `api` service + dashboard (own login); manual **Tailor** button wired to the
   Phase 0 facade; `interview_events` support: manual add + the "next event" sort column;
   `ingest_gmail` worker with OAuth + incremental sync + a shared LLM classifier upserting
-  leads (`source='gmail'`). Schema/migrations extracted into `packages/jobsearch_db`,
-  shared by both services rather than owned by `services/api` alone, once `ingest_gmail`
-  became a second consumer of the same tables. Reply-draft output for Gmail-sourced leads
-  is still deferred to Phase 2.
+  leads (`source='gmail'`), gated on a location filter (Atlanta, GA or fully remote, per the
+  user's requirement). Schema/migrations extracted into `packages/jobsearch_db`, shared by
+  both services rather than owned by `services/api` alone, once `ingest_gmail` became a
+  second consumer of the same tables. Reply-draft output for Gmail-sourced leads is still
+  deferred to Phase 2.
   - **First pass** (2026-09-17, no Docker): native PostgreSQL 17; `services/api`
     (FastAPI + SQLAlchemy 2.0 + Alembic + Jinja2/HTMX, htmx/Alpine vendored locally) with
     manual quick-add leads, status history, interview events; full loop driven through the
@@ -159,11 +160,22 @@ PDFs/artifacts stay on disk under `/data/jobs/<slug>/...` (matching today's pipe
     13/13 pytest passing against a hand-rolled fake Gmail service + `jobsearch_test`,
     covering idempotent re-runs (zero duplicate rows, zero repeat Claude calls), the
     prefilter gate, the confidence-threshold gate, and the 404 fallback.
-  - **Still needed** (human-required, can't be agent-driven): run `ingest-gmail authorize`
-    and complete the Google consent screen yourself; confirm the OAuth consent screen has
-    your email added as a Test user (Testing-status apps can otherwise lose refresh tokens
-    after 7 days); run `ingest-gmail run-once` against the real mailbox and spot-check
-    results; re-run immediately to confirm real-world idempotency.
+  - **Verified end-to-end against the real mailbox** (2026-09-17): user completed
+    `ingest-gmail authorize` and ran `ingest-gmail run-once` — 72 messages processed, 59
+    filtered by the cheap prefilter before ever reaching Claude, 13 classified, 2 real leads
+    correctly identified (high confidence) with the rest (bank/credit alerts, newsletters)
+    correctly rejected. Re-run confirmed idempotent on real data: 0 new leads, 0 duplicate
+    `email_messages` rows, took the incremental-sync path (not a full resync).
+  - **Location filter added** (2026-09-17): user wants only Atlanta, GA or fully-remote
+    roles. `classify_email()` now also extracts `location` and a `location_ok` boolean in
+    the same Claude call (no added cost/latency) against a configurable
+    `TARGET_LOCATION_DESCRIPTION` env var (default `"Atlanta, Georgia, or fully remote"`);
+    lead creation is gated on `location_ok` in addition to `is_job_lead`/confidence.
+    `email_messages` gained `location`/`location_ok` columns (migration `0003`) so a
+    real-but-wrong-location lead is still visible in the data even though no `Lead` row is
+    made. One already-created lead (Steneral Consulting, onsite-only in Iowa) predated this
+    filter and was removed by hand at the user's confirmation; `services/ingest_gmail`'s
+    suite grew to 15/15 passing with two new location-gate tests.
   - See [`services/api/README.md`](../../services/api/README.md),
     [`services/ingest_gmail/README.md`](../../services/ingest_gmail/README.md), and
     [`packages/jobsearch_db/README.md`](../../packages/jobsearch_db/README.md).

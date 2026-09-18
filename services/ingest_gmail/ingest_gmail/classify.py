@@ -14,6 +14,8 @@ class EmailClassification(BaseModel):
     is_job_lead: bool
     company: str | None = None
     role_title: str | None = None
+    location: str | None = None
+    location_ok: bool = False
     confidence: float = Field(ge=0.0, le=1.0)
     reason: str
 
@@ -45,7 +47,7 @@ def _resolve_schema_refs(schema: dict[str, Any]) -> dict[str, Any]:
     return resolved
 
 
-def _system_prompt() -> str:
+def _system_prompt(target_location_description: str) -> str:
     return (
         "You are an email triage assistant for a job search. Given the subject, sender, and "
         "body of a single email, decide whether it represents a job lead: a recruiter "
@@ -56,8 +58,17 @@ def _system_prompt() -> str:
         "marketing.\n"
         "- When is_job_lead=true, extract company and role_title if identifiable from the "
         "text; leave them null if genuinely unclear rather than guessing.\n"
+        "- Also extract the job's location as stated in the email (e.g. city/state, "
+        "'Remote', 'Hybrid - Atlanta, GA', 'Onsite - Des Moines, IA') into `location`; leave "
+        "it null if the email doesn't state one.\n"
+        f"- The candidate only wants roles in: {target_location_description}. Set "
+        "location_ok=true only if the stated location clearly satisfies that (a hybrid role "
+        "based in the target city counts; an onsite/relocation-required role elsewhere does "
+        "not). If is_job_lead=false or the location is genuinely unstated/ambiguous, set "
+        "location_ok=false.\n"
         "- confidence reflects how certain you are in the is_job_lead call itself (0.0-1.0).\n"
-        "- reason is a one-sentence justification.\n"
+        "- reason is a one-sentence justification covering both the is_job_lead and "
+        "location_ok calls.\n"
         f"- Call the {TOOL_NAME} tool with your result."
     )
 
@@ -84,7 +95,7 @@ def classify_email(*, subject: str, from_addr: str, body_text: str) -> EmailClas
     response = client.messages.create(
         model=settings.anthropic_model,
         max_tokens=1024,
-        system=_system_prompt(),
+        system=_system_prompt(settings.target_location_description),
         messages=[
             {
                 "role": "user",

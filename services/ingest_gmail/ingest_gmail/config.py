@@ -20,6 +20,7 @@ class Settings:
     anthropic_api_key: str
     anthropic_model: str
     classification_confidence_threshold: float
+    target_location_description: str
     poll_interval_minutes: int
     full_resync_days: int
     client_secret_path: Path
@@ -41,6 +42,9 @@ def _load_settings() -> Settings:
         anthropic_model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
         classification_confidence_threshold=float(
             os.environ.get("CLASSIFICATION_CONFIDENCE_THRESHOLD", "0.75")
+        ),
+        target_location_description=os.environ.get(
+            "TARGET_LOCATION_DESCRIPTION", "Atlanta, Georgia, or fully remote"
         ),
         poll_interval_minutes=int(os.environ.get("POLL_INTERVAL_MINUTES", "30")),
         full_resync_days=int(os.environ.get("FULL_RESYNC_DAYS", "7")),

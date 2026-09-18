@@ -59,10 +59,14 @@ ingest-gmail poll       # runs continuously, polling every POLL_INTERVAL_MINUTES
   domains, subject/body keywords) runs before spending a Claude call. Messages that fail it
   are stored as `classification='skipped_prefilter'` and never classified.
 - **Classification**: `classify_email()` (`ingest_gmail/classify.py`) — same forced-tool-call
-  pattern as `resume_pipeline.select.select_for_job`. Only `is_job_lead=true` above
-  `CLASSIFICATION_CONFIDENCE_THRESHOLD` (default `0.75`) creates a `Lead`
-  (`source='gmail'`, `source_ref=<gmail_thread_id>`) plus an initial `status_history` row
-  (`changed_by='system'`).
+  pattern as `resume_pipeline.select.select_for_job`. A `Lead` (`source='gmail'`,
+  `source_ref=<gmail_thread_id>`) plus an initial `status_history` row
+  (`changed_by='system'`) is only created when `is_job_lead=true`, confidence clears
+  `CLASSIFICATION_CONFIDENCE_THRESHOLD` (default `0.75`), **and** the extracted location
+  satisfies `TARGET_LOCATION_DESCRIPTION` (default `"Atlanta, Georgia, or fully remote"` —
+  edit in `.env` to change). Every classified message still gets its `location` and
+  `location_ok` stored on `email_messages` regardless, so a rejected-by-location lead is
+  visible in the data even though no `Lead` row was made for it.
 
 ## Testing
 
@@ -72,9 +76,10 @@ pytest services\ingest_gmail
 
 Runs against `jobsearch_test` with a hand-rolled fake Gmail `service` and a monkeypatched
 `classify_email` — no real network calls, no real Claude calls, no OAuth needed. Covers
-idempotent re-runs, the prefilter gate, the confidence threshold gate, and the 404
-stale-cursor fallback. The interactive `authorize` flow and a real end-to-end run against an
-actual mailbox aren't covered by these tests — they need a human at the keyboard.
+idempotent re-runs, the prefilter gate, the confidence threshold gate, the location-filter
+gate, and the 404 stale-cursor fallback. The interactive `authorize` flow and a real
+end-to-end run against an actual mailbox aren't covered by these tests — they need a human
+at the keyboard.
 
 ## Not built yet
 
