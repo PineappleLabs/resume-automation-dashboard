@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Log in — Job Search Dashboard{% endblock %}
+{% block content %}
+<h1>Log in</h1>
+<form class="stacked" method="post" action="/login">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label for="password">Password</label>
+  <input type="password" id="password" name="password" autofocus required>
+  {% if error %}<p class="error">Incorrect password.</p>{% endif %}
+  <button type="submit">Log in</button>
+</form>
+{% endblock %}

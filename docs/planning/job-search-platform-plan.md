@@ -20,6 +20,7 @@ Key decisions already made with the user, driving the design below:
 - **Homelab shape** (confirmed via SSH recon of bigpineapple): Docker Compose host (~50 containers), reverse proxy is **SWAG** (nginx + Let's Encrypt) on domain `acomos.us`, convention is one stack per app under `/home/bp/infra/stacks/<name>/docker-compose.yml` joining an external `swag-network` with no published host ports, plus a matching proxy-conf. **No SSO exists today** — all auth blocks in SWAG's template are commented out. An OpenVPN server container already runs on the box. **Watchtower** auto-updates images and must be excluded for this stack's containers (would silently drift Tectonic/Playwright/Chromium versions).
 - **Exposure**: dashboard will be **VPN-only** (reachable only over the existing OpenVPN server), not a public SWAG subdomain — given it will hold recruiter emails, a LinkedIn session, and can submit real applications.
 - **Repo structure**: turn the existing folder into a single monorepo (`git init` it) containing the existing pipeline as a package plus the new services, rather than a separate repo.
+- **Dev/test sequencing**: build and verify everything **locally first** (this Windows PC — no Docker, no SSH to the homelab) through the phases below; only once a phase works locally does it get containerized and pushed to `bigpineapple`. Phase 0 was originally verified via Docker on the homelab; it has since been re-verified running natively on Windows (Python 3.12 venv + a native Tectonic 0.17.0 Windows build) so local iteration doesn't require Docker at all until a phase is ready to deploy.
 
 ## Architecture
 
@@ -122,8 +123,50 @@ PDFs/artifacts stay on disk under `/data/jobs/<slug>/...` (matching today's pipe
 
 - **Phase 0 — Repo hygiene + library wrap. ✅ Done.** `git init` this folder as the monorepo root; move existing code under `packages/resume_pipeline/` with only import-path changes; add `service.py` facade + a pytest suite (stub the Anthropic client; pure tests for `fit.py`/`render.py`); Dockerize with a pinned Tectonic install; confirm `python -m resume_pipeline.cli tailor/render/inventory/verify-ats` behave identically both on the host and in-container, with **no dependency on Postgres or any new service** — this standalone path must keep working through every later phase since the user will keep using it directly while the dashboard is being built out.
   - Verified: 7-test pytest suite passing; Dockerfile built and run on `bigpineapple` over SSH with Tectonic 0.17.0 (required adding `libgraphite2-3` — the prebuilt binary needs it and fails silently otherwise); container output confirmed byte-identical to host output (only CRLF/LF difference).
+  - Re-verified locally on Windows (2026-09-17): Python 3.12 venv, `pip install -e ".[dev]"`, native `tectonic-0.17.0-x86_64-pc-windows-msvc` installed to `%LOCALAPPDATA%\tectonic\`; 7-test pytest suite passes; `python -m resume_pipeline.cli master` and `verify-ats` run end-to-end with no Docker involved. This is now the primary dev loop for every later phase — Docker/homelab stays the deployment target, not the dev target.
   - Repo pushed to [github.com/PineappleLabs/resume-automation-dashboard](https://github.com/PineappleLabs/resume-automation-dashboard).
-- **Phase 1 — Gmail ingestion + read-only dashboard.** Postgres + `api` service + read-only dashboard (VPN-only, own login); `ingest_gmail` worker with OAuth + incremental sync + classifier; manual **Tailor** button wired to the Phase 0 facade, including the new reply-draft output for Gmail-sourced leads (send stays manual/copy-paste in this phase — Gmail send-integration lands once the dashboard is trusted). Basic `interview_events` support: manual add + the "next event" sort column. Run for a couple of weeks against the real inbox before adding write-side automation.
+- **Phase 1 — Gmail ingestion + dashboard. 🟢 Built; one manual step left before it's proven end-to-end.**
+  Postgres + `api` service + dashboard (own login); manual **Tailor** button wired to the
+  Phase 0 facade; `interview_events` support: manual add + the "next event" sort column;
+  `ingest_gmail` worker with OAuth + incremental sync + a shared LLM classifier upserting
+  leads (`source='gmail'`). Schema/migrations extracted into `packages/jobsearch_db`,
+  shared by both services rather than owned by `services/api` alone, once `ingest_gmail`
+  became a second consumer of the same tables. Reply-draft output for Gmail-sourced leads
+  is still deferred to Phase 2.
+  - **First pass** (2026-09-17, no Docker): native PostgreSQL 17; `services/api`
+    (FastAPI + SQLAlchemy 2.0 + Alembic + Jinja2/HTMX, htmx/Alpine vendored locally) with
+    manual quick-add leads, status history, interview events; full loop driven through the
+    actual browser (login, quick-add, HTMX status/event updates, soonest-event sort
+    confirmed with 3 leads, logout); 6/6 pytest passing.
+  - **Tailor success path verified** (2026-09-17): once the user added a real
+    `ANTHROPIC_API_KEY` to `packages/resume_pipeline/.env`, clicked Tailor on a real lead
+    through the dashboard — real Claude call, one-page PDF generated into
+    `packages/resume_pipeline/jobs/<slug>/`, download link confirmed working.
+  - **`packages/jobsearch_db` extraction** (2026-09-17): `services/api/app/db.py`/
+    `models.py` moved to a shared package and reduced to two-line re-export shims (zero
+    changes needed in routers/`slugs.py`/tests, since all of them already used relative
+    imports); `DATABASE_URL` moved to `packages/jobsearch_db/.env`, its new canonical home
+    (same sharing pattern as `ANTHROPIC_API_KEY`); services/api's existing 6 tests still
+    pass unmodified; 6 new `jobsearch_db` model tests added (constraint/cascade checks,
+    including confirming `email_threads.lead_id` does `SET NULL` not `CASCADE` on lead
+    delete).
+  - **Gmail worker built** (2026-09-17): `email_threads`/`email_messages` tables added via
+    a second migration (`gmail_history_id` as `BigInteger`, not `String` — avoids a
+    lexicographic-`MAX()` bug on the sync cursor); OAuth module (interactive `authorize`,
+    silent-refresh `load_credentials`); rule prefilter before the Claude classifier;
+    `run_once()` sync orchestration with incremental (`history.list`) + full-resync
+    (`messages.list`) fallback on a 404 stale cursor; CLI (`authorize`/`run-once`/`poll`).
+    13/13 pytest passing against a hand-rolled fake Gmail service + `jobsearch_test`,
+    covering idempotent re-runs (zero duplicate rows, zero repeat Claude calls), the
+    prefilter gate, the confidence-threshold gate, and the 404 fallback.
+  - **Still needed** (human-required, can't be agent-driven): run `ingest-gmail authorize`
+    and complete the Google consent screen yourself; confirm the OAuth consent screen has
+    your email added as a Test user (Testing-status apps can otherwise lose refresh tokens
+    after 7 days); run `ingest-gmail run-once` against the real mailbox and spot-check
+    results; re-run immediately to confirm real-world idempotency.
+  - See [`services/api/README.md`](../../services/api/README.md),
+    [`services/ingest_gmail/README.md`](../../services/ingest_gmail/README.md), and
+    [`packages/jobsearch_db/README.md`](../../packages/jobsearch_db/README.md).
 - **Phase 2 — Status-update monitoring + scheduling parsing + Gmail send.** Extend `ingest_gmail` to watch linked threads, classify replies, auto-append `status_history` with confidence-gated auto-update vs. flag-for-review; add `.ics`/scheduling-language parsing to propose `interview_events(source=gmail_parsed)` for one-click confirm; wire the dashboard's "Send via Gmail" button (`users.messages.send` with PDF attached, replying into the existing thread).
 - **Phase 3 — LinkedIn ingestion.** `ingest_linkedin` worker with a persisted session, same shared classifier producing leads + reply drafts (copy-to-clipboard only — no automated LinkedIn sending yet), feature-flagged so it can be disabled instantly.
 - **Phase 4 — Auto-apply agent.** `autoapply_agent` + `agent_runs`/`applications` tables + the dashboard's Apply Now → Preview → Confirm & Submit flow; pilot against a couple of simple ATS platforms (e.g. Greenhouse) before trusting it broadly; ship with a visible kill switch.

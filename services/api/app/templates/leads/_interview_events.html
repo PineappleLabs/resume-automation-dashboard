@@ -1,0 +1,37 @@
+<div id="interview-events" class="card">
+  <h3>Interview events</h3>
+  {% if lead.interview_events %}
+  <ul class="plain">
+    {% for event in lead.interview_events %}
+    <li>
+      <strong>{{ event.scheduled_at.strftime("%Y-%m-%d %H:%M") }}</strong>
+      — {{ event.event_type }}
+      {% if event.location_or_link %}({{ event.location_or_link }}){% endif %}
+      {% if event.notes %}<br><span class="muted">{{ event.notes }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No events scheduled.</p>
+  {% endif %}
+
+  <form class="stacked" hx-post="/leads/{{ lead.id }}/interview-events" hx-target="#interview-events" hx-swap="outerHTML">
+    <label for="scheduled_at">Date/time</label>
+    <input type="datetime-local" id="scheduled_at" name="scheduled_at" required>
+
+    <label for="event_type">Type</label>
+    <select id="event_type" name="event_type">
+      {% for t in interview_types %}
+      <option value="{{ t }}">{{ t }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="location_or_link">Location / link (optional)</label>
+    <input type="text" id="location_or_link" name="location_or_link">
+
+    <label for="notes">Notes (optional)</label>
+    <input type="text" id="notes" name="notes">
+
+    <button type="submit">Add event</button>
+  </form>
+</div>

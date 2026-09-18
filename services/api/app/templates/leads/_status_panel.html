@@ -1,0 +1,27 @@
+<div id="status-panel" class="card">
+  <p>Status: <span class="badge">{{ lead.status }}</span></p>
+  <form class="stacked" hx-post="/leads/{{ lead.id }}/status" hx-target="#status-panel" hx-swap="outerHTML">
+    <label for="new_status">Change status</label>
+    <select id="new_status" name="new_status">
+      {% for s in lead_statuses %}
+      <option value="{{ s }}" {% if s == lead.status %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <label for="reason">Reason (optional)</label>
+    <input type="text" id="reason" name="reason">
+    <button type="submit">Update status</button>
+  </form>
+
+  {% if lead.status_history %}
+  <h3>History</h3>
+  <ul class="plain">
+    {% for entry in lead.status_history %}
+    <li>
+      <span class="muted">{{ entry.changed_at.strftime("%Y-%m-%d %H:%M") }}</span>
+      — {{ entry.old_status or "(none)" }} → {{ entry.new_status }}
+      {% if entry.reason %}<br><span class="muted">{{ entry.reason }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>

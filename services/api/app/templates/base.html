@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Job Search Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/js/htmx.min.js"></script>
+  <script src="/static/js/alpine.min.js" defer></script>
+</head>
+<body>
+  {% if request.session.get("authenticated") %}
+  <nav>
+    <a href="/leads">Job Search Dashboard</a>
+    <form method="post" action="/logout" style="margin:0;">
+      <button type="submit" style="margin:0; background:transparent; color:var(--muted); border:1px solid var(--border);">Log out</button>
+    </form>
+  </nav>
+  {% endif %}
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

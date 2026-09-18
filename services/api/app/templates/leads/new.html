@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Add lead — Job Search Dashboard{% endblock %}
+{% block content %}
+<h1>Add lead</h1>
+<form class="stacked" method="post" action="/leads">
+  <label for="company">Company</label>
+  <input type="text" id="company" name="company" required>
+
+  <label for="role_title">Role title</label>
+  <input type="text" id="role_title" name="role_title" required>
+
+  <label for="jd_text">Job description</label>
+  <textarea id="jd_text" name="jd_text" required></textarea>
+
+  <label for="jd_url">Job posting URL (optional)</label>
+  <input type="url" id="jd_url" name="jd_url">
+
+  <label for="recruiter_name">Recruiter name (optional)</label>
+  <input type="text" id="recruiter_name" name="recruiter_name">
+
+  <label for="recruiter_contact">Recruiter contact (optional)</label>
+  <input type="text" id="recruiter_contact" name="recruiter_contact">
+
+  <button type="submit">Add lead</button>
+</form>
+{% endblock %}

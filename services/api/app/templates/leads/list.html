@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Leads — Job Search Dashboard{% endblock %}
+{% block content %}
+<h1>Leads</h1>
+<a class="button" href="/leads/new">+ Add lead</a>
+
+{% if leads %}
+<table>
+  <thead>
+    <tr>
+      <th>Company</th>
+      <th>Role</th>
+      <th>Status</th>
+      <th>Next event</th>
+      <th>Source</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in leads %}
+    <tr>
+      <td><a href="/leads/{{ row.lead.id }}">{{ row.lead.company }}</a></td>
+      <td>{{ row.lead.role_title }}</td>
+      <td><span class="badge">{{ row.lead.status }}</span></td>
+      <td>{{ row.next_event_at.strftime("%Y-%m-%d %H:%M") if row.next_event_at else "—" }}</td>
+      <td class="muted">{{ row.lead.source }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No leads yet. Add one to get started.</p>
+{% endif %}
+{% endblock %}

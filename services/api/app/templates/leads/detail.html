@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.company }} — {{ lead.role_title }}{% endblock %}
+{% block content %}
+<p><a href="/leads">&larr; All leads</a></p>
+<h1>{{ lead.company }} — {{ lead.role_title }}</h1>
+<p class="muted">
+  Source: {{ lead.source }}
+  {% if lead.recruiter_name %} · Recruiter: {{ lead.recruiter_name }}{% endif %}
+  {% if lead.recruiter_contact %} ({{ lead.recruiter_contact }}){% endif %}
+  {% if lead.jd_url %} · <a href="{{ lead.jd_url }}" target="_blank" rel="noopener">Posting</a>{% endif %}
+</p>
+
+{% include "leads/_status_panel.html" %}
+
+<div class="card">
+  <h3>Job description</h3>
+  {% if lead.jd_text %}
+  <p style="white-space: pre-wrap;">{{ lead.jd_text }}</p>
+  {% else %}
+  <p class="muted">No job description text.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>Tailored resume</h3>
+  <button hx-post="/leads/{{ lead.id }}/tailor" hx-target="#tailor-result" hx-swap="innerHTML" hx-indicator="#tailor-spinner">
+    Tailor
+  </button>
+  <span id="tailor-spinner" class="htmx-indicator muted">Working…</span>
+  <div id="tailor-result">
+    {% if tailor_result %}
+    <p><strong>Rationale:</strong> {{ tailor_result.rationale }}</p>
+    <a class="button" href="/leads/{{ lead.id }}/resume.pdf">Download PDF</a>
+    {% else %}
+    <p class="muted">No resume tailored yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% include "leads/_interview_events.html" %}
+{% endblock %}

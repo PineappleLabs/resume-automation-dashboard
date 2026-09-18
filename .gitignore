@@ -14,3 +14,8 @@ dist/
 
 packages/resume_pipeline/out/
 packages/resume_pipeline/jobs/
+
+# Gmail OAuth client + per-user tokens -- password-equivalent, never committed.
+services/ingest_gmail/secrets/
+client_secret*.json
+token.json
