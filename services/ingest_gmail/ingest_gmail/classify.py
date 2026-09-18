@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import anthropic
+from jobsearch_db.models import INTERVIEW_TYPES
 from pydantic import BaseModel, Field
 
 from .config import settings
@@ -16,6 +17,11 @@ class EmailClassification(BaseModel):
     role_title: str | None = None
     location: str | None = None
     location_ok: bool = False
+    interview_mentioned: bool = False
+    interview_datetime: str | None = None
+    interview_type: str | None = None
+    interview_location_or_link: str | None = None
+    interview_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     confidence: float = Field(ge=0.0, le=1.0)
     reason: str
 
@@ -66,9 +72,23 @@ def _system_prompt(target_location_description: str) -> str:
         "based in the target city counts; an onsite/relocation-required role elsewhere does "
         "not). If is_job_lead=false or the location is genuinely unstated/ambiguous, set "
         "location_ok=false.\n"
+        "- Also decide whether THIS email states a specific interview, phone screen, or call "
+        "with a concrete date and time (an invite, a confirmation, a 'let's talk Thursday at "
+        "2pm' message, or a meeting link with an embedded date) -- not a vague 'let's find a "
+        "time soon'. Set interview_mentioned=true only when a specific date/time is actually "
+        "stated in this email.\n"
+        "- When interview_mentioned=true: interview_datetime is that date/time as an ISO 8601 "
+        "string (YYYY-MM-DDTHH:MM:SS, plus a UTC offset like -04:00 if the email states a "
+        "timezone, otherwise omit the offset) -- infer the year from context if not stated "
+        "(assume the most plausible upcoming date); interview_type is your best guess from "
+        f"[{', '.join(INTERVIEW_TYPES)}]; interview_location_or_link is the meeting "
+        "link/dial-in/physical location if given, else null.\n"
+        "- interview_confidence reflects certainty in interview_mentioned and the extracted "
+        "datetime (0.0-1.0). Leave interview_mentioned=false, interview_datetime=null, and "
+        "interview_confidence=0.0 when no specific date/time is stated.\n"
         "- confidence reflects how certain you are in the is_job_lead call itself (0.0-1.0).\n"
-        "- reason is a one-sentence justification covering both the is_job_lead and "
-        "location_ok calls.\n"
+        "- reason is a one-sentence justification covering the is_job_lead, location_ok, and "
+        "interview_mentioned calls.\n"
         f"- Call the {TOOL_NAME} tool with your result."
     )
 

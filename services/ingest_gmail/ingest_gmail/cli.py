@@ -25,6 +25,7 @@ def run_once_cmd() -> None:
     stats = run_once()
     click.echo(
         f"{stats.total} message(s): {stats.leads_created} lead(s) created, "
+        f"{stats.interview_events_created} interview event(s) added, "
         f"{stats.filtered_by_location} filtered out by location, "
         f"{stats.classified} classified, {stats.prefiltered} skipped by prefilter, "
         f"{stats.skipped_existing} already seen."

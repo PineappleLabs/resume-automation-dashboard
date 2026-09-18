@@ -33,7 +33,22 @@ def list_leads(request: Request, db: Session = Depends(get_db)) -> object:
     )
     rows = db.execute(stmt).all()
     leads = [{"lead": lead, "next_event_at": next_at} for lead, next_at in rows]
-    return templates.TemplateResponse(request, "leads/list.html", {"leads": leads})
+
+    gmail_refresh = None
+    params = request.query_params
+    if "gmail_error" in params:
+        gmail_refresh = {"error": params["gmail_error"]}
+    elif "gmail_total" in params:
+        gmail_refresh = {
+            "total": params.get("gmail_total"),
+            "created": params.get("gmail_created"),
+            "events": params.get("gmail_events"),
+            "filtered": params.get("gmail_filtered"),
+        }
+
+    return templates.TemplateResponse(
+        request, "leads/list.html", {"leads": leads, "gmail_refresh": gmail_refresh}
+    )
 
 
 @router.get("/leads/new")

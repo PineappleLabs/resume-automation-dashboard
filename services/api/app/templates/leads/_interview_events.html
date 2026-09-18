@@ -7,6 +7,7 @@
       <strong>{{ event.scheduled_at.strftime("%Y-%m-%d %H:%M") }}</strong>
       — {{ event.event_type }}
       {% if event.location_or_link %}({{ event.location_or_link }}){% endif %}
+      {% if event.source == "gmail_parsed" %}<span class="badge">from Gmail</span>{% endif %}
       {% if event.notes %}<br><span class="muted">{{ event.notes }}</span>{% endif %}
     </li>
     {% endfor %}

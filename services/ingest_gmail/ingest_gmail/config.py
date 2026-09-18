@@ -21,6 +21,7 @@ class Settings:
     anthropic_model: str
     classification_confidence_threshold: float
     target_location_description: str
+    interview_confidence_threshold: float
     poll_interval_minutes: int
     full_resync_days: int
     client_secret_path: Path
@@ -45,6 +46,9 @@ def _load_settings() -> Settings:
         ),
         target_location_description=os.environ.get(
             "TARGET_LOCATION_DESCRIPTION", "Atlanta, Georgia, or fully remote"
+        ),
+        interview_confidence_threshold=float(
+            os.environ.get("INTERVIEW_CONFIDENCE_THRESHOLD", "0.75")
         ),
         poll_interval_minutes=int(os.environ.get("POLL_INTERVAL_MINUTES", "30")),
         full_resync_days=int(os.environ.get("FULL_RESYNC_DAYS", "7")),

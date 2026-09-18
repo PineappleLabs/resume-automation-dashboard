@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from .config import settings
-from .routers import auth, interview_events, leads, tailor
+from .routers import auth, gmail, interview_events, leads, tailor
 from .security import NotAuthenticated
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -32,3 +32,4 @@ app.include_router(auth.router)
 app.include_router(leads.router)
 app.include_router(interview_events.router)
 app.include_router(tailor.router)
+app.include_router(gmail.router)

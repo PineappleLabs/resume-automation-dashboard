@@ -1,9 +1,11 @@
 # Gmail ingestion worker
 
-Reads the user's Gmail inbox, classifies messages as job leads via Claude, and upserts them
-into the same `leads` table [`services/api`](../api/README.md) reads. First full Gmail slice
-from [`docs/planning/job-search-platform-plan.md`](../../docs/planning/job-search-platform-plan.md)'s
-Phase 1 — reply monitoring, `.ics` parsing, and Gmail send are later passes.
+Reads the user's Gmail inbox, classifies messages as job leads via Claude, extracts
+mentioned interview dates, and upserts both into the same tables
+[`services/api`](../api/README.md) reads. First full Gmail slice from
+[`docs/planning/job-search-platform-plan.md`](../../docs/planning/job-search-platform-plan.md)'s
+Phase 1 — auto status-transition-from-replies, `.ics` attachment parsing, and Gmail send are
+later passes.
 
 ## Setup
 
@@ -73,6 +75,25 @@ ingest-gmail poll       # runs continuously, polling every POLL_INTERVAL_MINUTES
 - **`resume_job_slug`**: assigned via `ingest_gmail/slugs.py` (mirrors
   `services/api/app/slugs.py`) the moment a `Lead` is created — required for the dashboard's
   Tailor button, which calls `resume_pipeline.service.tailor_lead()` with it.
+- **`received_at`**: set to the thread's *earliest* known message time
+  (`MIN(email_messages.received_at)` across the thread), not whichever message happened to
+  trigger lead creation — a full resync doesn't guarantee messages arrive in chronological
+  order, so the message that first classifies as a qualifying lead isn't necessarily the
+  thread's first message.
+- **Interview date detection**: `classify_email()` also extracts, per message,
+  `interview_mentioned`/`interview_datetime`/`interview_type`/`interview_location_or_link`/
+  `interview_confidence` in the same Claude call (no added cost). When a message states a
+  specific interview/call date and `interview_confidence` clears
+  `INTERVIEW_CONFIDENCE_THRESHOLD` (default `0.75`), an `InterviewEvent` is created
+  (`source='gmail_parsed'`) on the thread's lead — attached even if *that specific message*
+  isn't independently judged a fresh job lead (e.g. a one-line "Confirmed for Thursday!"
+  reply on an already-existing lead's thread still gets its date parsed and attached).
+  Re-mentioning the same date/time on the same lead is deduplicated (no double-booking from
+  an invite + a "confirmed!" reply). This only looks at the single message being analyzed,
+  not the full thread history — a reply that just says "sounds good" with the date implied
+  by context rather than restated won't be caught; extend to multi-message thread context
+  later if that turns out to matter in practice. `.ics` calendar-attachment parsing (as
+  opposed to a date written in the message body/subject) isn't implemented.
 
 ## Testing
 
@@ -83,11 +104,14 @@ pytest services\ingest_gmail
 Runs against `jobsearch_test` with a hand-rolled fake Gmail `service` and a monkeypatched
 `classify_email` — no real network calls, no real Claude calls, no OAuth needed. Covers
 idempotent re-runs, the prefilter gate, the confidence threshold gate, the location-filter
-gate, and the 404 stale-cursor fallback. The interactive `authorize` flow and a real
-end-to-end run against an actual mailbox aren't covered by these tests — they need a human
-at the keyboard.
+gate, the 404 stale-cursor fallback, `received_at` reflecting the thread's earliest message
+regardless of processing order, and interview-event creation/dedup/confidence-gating
+(including attaching to an already-existing lead from a reply that isn't independently a
+fresh lead). The interactive `authorize` flow and a real end-to-end run against an actual
+mailbox aren't covered by these tests — they need a human at the keyboard.
 
 ## Not built yet
 
-Reply-monitoring / auto status updates, `.ics` scheduling parsing, Gmail send, LinkedIn
-ingestion, the auto-apply agent, Docker/infra, unattended scheduling.
+Reply-monitoring / auto status updates (interview *dates* are auto-detected — see above —
+but a reply doesn't change `Lead.status`), `.ics` calendar-attachment parsing, Gmail send,
+LinkedIn ingestion, the auto-apply agent, Docker/infra, unattended scheduling.

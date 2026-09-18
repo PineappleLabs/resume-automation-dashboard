@@ -3,6 +3,24 @@
 {% block content %}
 <h1>Leads</h1>
 <a class="button" href="/leads/new">+ Add lead</a>
+<form method="post" action="/gmail/refresh" style="display:inline;">
+  <button type="submit" class="button" style="background:var(--muted);">Refresh from Gmail</button>
+</form>
+
+{% if gmail_refresh %}
+<div class="card">
+  {% if gmail_refresh.error %}
+  <p class="error">Gmail refresh failed: {{ gmail_refresh.error }}</p>
+  {% else %}
+  <p>
+    Gmail refresh: {{ gmail_refresh.total }} message(s) checked,
+    {{ gmail_refresh.created }} new lead(s),
+    {{ gmail_refresh.events }} interview event(s) added,
+    {{ gmail_refresh.filtered }} filtered out by location.
+  </p>
+  {% endif %}
+</div>
+{% endif %}
 
 {% if leads %}
 <table>

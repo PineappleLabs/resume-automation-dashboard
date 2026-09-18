@@ -176,10 +176,38 @@ PDFs/artifacts stay on disk under `/data/jobs/<slug>/...` (matching today's pipe
     made. One already-created lead (Steneral Consulting, onsite-only in Iowa) predated this
     filter and was removed by hand at the user's confirmation; `services/ingest_gmail`'s
     suite grew to 15/15 passing with two new location-gate tests.
+  - **Bug fix** (2026-09-17): the Tailor button crashed (`Path / None`) on any Gmail-sourced
+    lead — `_upsert_lead()` never assigned `resume_job_slug`, unlike the dashboard's manual
+    quick-add path. Fixed via `ingest_gmail/slugs.py` (mirrors
+    `services/api/app/slugs.py`); regression test added.
+  - **Manual refresh + interview-date parsing pulled forward from Phase 2** (2026-09-17), at
+    the user's request: a **Refresh from Gmail** button on the dashboard's leads list calls
+    `ingest_gmail.sync.run_once()` in-process (lazily imported in the new
+    `services/api/app/routers/gmail.py`, so a missing OAuth/API key only breaks this one
+    button, not app startup — the same lesson as the earlier `ANTHROPIC_API_KEY`/
+    `DATABASE_URL` startup bug), redirecting back to `/leads` with a summary via query-string
+    flash params. Separately, `classify_email()` now also extracts a per-message
+    `interview_mentioned`/`interview_datetime`/`interview_type`/
+    `interview_location_or_link`/`interview_confidence` in the same Claude call; a
+    confidence-gated match creates an `InterviewEvent(source='gmail_parsed')` on the
+    thread's lead (deduplicated on exact same-time re-mentions, and correctly attaches even
+    when the triggering message isn't independently judged a fresh lead — e.g. a bare
+    "confirmed!" reply on an existing thread). Also fixed: `Lead.received_at` for
+    Gmail-sourced leads now reflects the thread's *earliest* message
+    (`MIN(email_messages.received_at)`), not whichever message happened to trigger lead
+    creation — full resyncs don't guarantee chronological processing order.
+    `services/ingest_gmail`'s suite grew to 22/22 passing; `services/api` grew to 9/9 with a
+    new `test_gmail_refresh.py`. True full-thread-context date reasoning and `.ics`
+    calendar-attachment parsing are still not implemented — noted as future work.
   - See [`services/api/README.md`](../../services/api/README.md),
     [`services/ingest_gmail/README.md`](../../services/ingest_gmail/README.md), and
     [`packages/jobsearch_db/README.md`](../../packages/jobsearch_db/README.md).
-- **Phase 2 — Status-update monitoring + scheduling parsing + Gmail send.** Extend `ingest_gmail` to watch linked threads, classify replies, auto-append `status_history` with confidence-gated auto-update vs. flag-for-review; add `.ics`/scheduling-language parsing to propose `interview_events(source=gmail_parsed)` for one-click confirm; wire the dashboard's "Send via Gmail" button (`users.messages.send` with PDF attached, replying into the existing thread).
+- **Phase 2 — Status-update monitoring + Gmail send.** Extend `ingest_gmail` to auto-append
+  `status_history` from classified replies with confidence-gated auto-update vs.
+  flag-for-review (interview-date extraction itself already landed early, see above); add
+  `.ics` calendar-attachment parsing to complement the body-text date extraction already in
+  place; wire the dashboard's "Send via Gmail" button (`users.messages.send` with PDF
+  attached, replying into the existing thread).
 - **Phase 3 — LinkedIn ingestion.** `ingest_linkedin` worker with a persisted session, same shared classifier producing leads + reply drafts (copy-to-clipboard only — no automated LinkedIn sending yet), feature-flagged so it can be disabled instantly.
 - **Phase 4 — Auto-apply agent.** `autoapply_agent` + `agent_runs`/`applications` tables + the dashboard's Apply Now → Preview → Confirm & Submit flow; pilot against a couple of simple ATS platforms (e.g. Greenhouse) before trusting it broadly; ship with a visible kill switch.
 

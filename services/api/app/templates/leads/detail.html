@@ -8,6 +8,7 @@
   {% if lead.recruiter_name %} · Recruiter: {{ lead.recruiter_name }}{% endif %}
   {% if lead.recruiter_contact %} ({{ lead.recruiter_contact }}){% endif %}
   {% if lead.jd_url %} · <a href="{{ lead.jd_url }}" target="_blank" rel="noopener">Posting</a>{% endif %}
+  {% if lead.received_at %} · First contact: {{ lead.received_at.strftime("%Y-%m-%d %H:%M") }}{% endif %}
 </p>
 
 {% include "leads/_status_panel.html" %}

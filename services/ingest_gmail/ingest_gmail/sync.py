@@ -8,7 +8,14 @@ from dataclasses import dataclass
 
 from googleapiclient.errors import HttpError
 from jobsearch_db.db import SessionLocal
-from jobsearch_db.models import EmailMessage, EmailThread, Lead, StatusHistory
+from jobsearch_db.models import (
+    INTERVIEW_TYPES,
+    EmailMessage,
+    EmailThread,
+    InterviewEvent,
+    Lead,
+    StatusHistory,
+)
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -29,6 +36,7 @@ class SyncStats:
     classified: int = 0
     leads_created: int = 0
     filtered_by_location: int = 0
+    interview_events_created: int = 0
 
 
 def _get_cursor(db: Session) -> int | None:
@@ -97,6 +105,36 @@ def _parse_internal_date(internal_date: str | None) -> dt.datetime | None:
     return dt.datetime.fromtimestamp(int(internal_date) / 1000, tz=dt.timezone.utc)
 
 
+def _parse_interview_datetime(value: str) -> dt.datetime | None:
+    """Parse the classifier's ISO 8601 string into a naive local datetime.
+
+    interview_events.scheduled_at is stored naive everywhere else (the manual add-event
+    form is a browser datetime-local input with no timezone), so a timezone-aware result
+    here is converted to the system's local time and stripped, to match.
+    """
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+    except ValueError:
+        logger.warning("Could not parse interview_datetime %r from classifier", value)
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed
+
+
+def _earliest_received_at(db: Session, thread_id: int, fallback: dt.datetime | None) -> dt.datetime | None:
+    """The thread's oldest known message time, so a lead's received_at reflects when the
+    conversation actually started -- not whichever message happened to trigger lead
+    creation. A full resync can process a thread's messages out of chronological order
+    (Gmail's messages.list is not guaranteed newest-last), so this can't just use the
+    current message's own timestamp.
+    """
+    earliest = db.execute(
+        select(func.min(EmailMessage.received_at)).where(EmailMessage.thread_id == thread_id)
+    ).scalar()
+    return earliest or fallback
+
+
 def _upsert_lead(
     db: Session,
     thread: EmailThread,
@@ -104,13 +142,14 @@ def _upsert_lead(
     from_addr: str,
     body_text: str,
     received_at: dt.datetime | None,
-) -> Lead:
+) -> tuple[Lead, bool]:
     existing = db.execute(
         select(Lead).where(Lead.source == "gmail", Lead.source_ref == thread.gmail_thread_id)
     ).scalar_one_or_none()
     if existing is not None:
-        return existing
+        return existing, False
 
+    db.flush()  # make this message's just-added EmailMessage row visible to the query below
     lead = Lead(
         company=result.company or "Unknown",
         role_title=result.role_title or "Unknown",
@@ -118,7 +157,7 @@ def _upsert_lead(
         source_ref=thread.gmail_thread_id,
         jd_text=body_text,
         recruiter_contact=from_addr,
-        received_at=received_at,
+        received_at=_earliest_received_at(db, thread.id, received_at),
         status="new",
     )
     db.add(lead)
@@ -135,10 +174,47 @@ def _upsert_lead(
             reason=f"Classified from Gmail thread {thread.gmail_thread_id}: {result.reason}",
         )
     )
-    return lead
+    return lead, True
 
 
-def _process_message(db: Session, service, ref: dict, threshold: float, stats: SyncStats) -> None:
+def _create_interview_event(
+    db: Session, lead: Lead, result: EmailClassification, scheduled_at: dt.datetime
+) -> bool:
+    """Returns False (no-op) if an event at this exact time already exists on the lead --
+    an invite followed by a "confirmed!" reply both mentioning the same time shouldn't
+    create two events.
+    """
+    db.flush()  # autoflush is off; make any earlier-in-this-run InterviewEvent visible
+    existing = db.execute(
+        select(InterviewEvent.id).where(
+            InterviewEvent.lead_id == lead.id, InterviewEvent.scheduled_at == scheduled_at
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return False
+
+    event_type = result.interview_type if result.interview_type in INTERVIEW_TYPES else "other"
+    db.add(
+        InterviewEvent(
+            lead_id=lead.id,
+            scheduled_at=scheduled_at,
+            event_type=event_type,
+            location_or_link=result.interview_location_or_link,
+            notes=f"Parsed from Gmail: {result.reason}",
+            source="gmail_parsed",
+        )
+    )
+    return True
+
+
+def _process_message(
+    db: Session,
+    service,
+    ref: dict,
+    threshold: float,
+    interview_threshold: float,
+    stats: SyncStats,
+) -> None:
     gmail_message_id = ref["id"]
     if db.execute(
         select(EmailMessage.id).where(EmailMessage.gmail_message_id == gmail_message_id)
@@ -199,19 +275,43 @@ def _process_message(db: Session, service, ref: dict, threshold: float, stats: S
         )
     )
     stats.classified += 1
+
+    lead: Lead | None = None
     if result.is_job_lead and result.confidence >= threshold:
         if result.location_ok:
-            _upsert_lead(db, thread, result, from_addr, body_text, received_at)
-            stats.leads_created += 1
+            lead, created = _upsert_lead(db, thread, result, from_addr, body_text, received_at)
+            if created:
+                stats.leads_created += 1
         else:
             stats.filtered_by_location += 1
 
+    if lead is None and thread.lead_id is not None:
+        lead = db.get(Lead, thread.lead_id)
+
+    if (
+        lead is not None
+        and result.interview_mentioned
+        and result.interview_datetime
+        and result.interview_confidence >= interview_threshold
+    ):
+        scheduled_at = _parse_interview_datetime(result.interview_datetime)
+        if scheduled_at is not None and _create_interview_event(db, lead, result, scheduled_at):
+            stats.interview_events_created += 1
+
 
 def run_once(
-    *, confidence_threshold: float | None = None, full_resync_days: int | None = None
+    *,
+    confidence_threshold: float | None = None,
+    interview_confidence_threshold: float | None = None,
+    full_resync_days: int | None = None,
 ) -> SyncStats:
     threshold = confidence_threshold if confidence_threshold is not None else (
         settings.classification_confidence_threshold
+    )
+    interview_threshold = (
+        interview_confidence_threshold
+        if interview_confidence_threshold is not None
+        else settings.interview_confidence_threshold
     )
     days = full_resync_days or settings.full_resync_days
     service = get_gmail_service()
@@ -233,7 +333,7 @@ def run_once(
 
         stats.total = len(refs)
         for ref in refs:
-            _process_message(db, service, ref, threshold, stats)
+            _process_message(db, service, ref, threshold, interview_threshold, stats)
         db.commit()
 
     return stats

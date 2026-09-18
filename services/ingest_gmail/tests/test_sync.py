@@ -4,7 +4,7 @@ import base64
 
 import pytest
 from googleapiclient.errors import HttpError
-from jobsearch_db.models import EmailMessage, EmailThread, Lead
+from jobsearch_db.models import EmailMessage, EmailThread, InterviewEvent, Lead
 from sqlalchemy import select
 
 from ingest_gmail import sync as sync_module
@@ -15,12 +15,12 @@ def _b64(text: str) -> str:
     return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
 
-def _make_full_message(msg_id, thread_id, history_id, subject, from_addr, body):
+def _make_full_message(msg_id, thread_id, history_id, subject, from_addr, body, internal_date_ms="1758000000000"):
     return {
         "id": msg_id,
         "threadId": thread_id,
         "historyId": str(history_id),
-        "internalDate": "1758000000000",
+        "internalDate": internal_date_ms,
         "payload": {
             "mimeType": "text/plain",
             "headers": [
@@ -278,3 +278,228 @@ def test_expired_history_cursor_falls_back_to_full_resync(db, monkeypatch, count
     assert history.list_calls == 1
     assert messages.list_calls == 1  # fell back to messages().list() full resync
     assert stats.leads_created == 1
+
+
+def test_lead_received_at_reflects_earliest_thread_message(db, monkeypatch):
+    # A full resync doesn't guarantee chronological order; the chit-chat message here is
+    # older but gets prefiltered (never creates the lead) -- the lead should still pick up
+    # its received_at, not the newer message's that actually triggers creation.
+    older = _make_full_message(
+        "m-older",
+        "t1",
+        100,
+        "Just checking in",
+        "someone@example.com",
+        "Hey, hope you're doing well!",
+        internal_date_ms="1758000000000",
+    )
+    newer = _make_full_message(
+        "m-newer",
+        "t1",
+        101,
+        "Interview opportunity",
+        "recruiter@greenhouse.io",
+        "We have a role for you in Atlanta!",
+        internal_date_ms="1758100000000",
+    )
+    messages = _FakeMessagesResource(
+        {"m-older": older, "m-newer": newer},
+        {"messages": [{"id": "m-older"}, {"id": "m-newer"}]},
+    )
+    history = _FakeHistoryResource({"history": []})
+    monkeypatch.setattr(
+        sync_module, "get_gmail_service", lambda: _FakeGmailService(messages, history)
+    )
+    monkeypatch.setattr(
+        sync_module,
+        "classify_email",
+        lambda **kwargs: EmailClassification(
+            is_job_lead=True,
+            company="Acme",
+            role_title="Eng",
+            location="Atlanta, GA",
+            location_ok=True,
+            confidence=0.9,
+            reason="Real lead.",
+        ),
+    )
+
+    stats = sync_module.run_once()
+
+    assert stats.prefiltered == 1  # the chit-chat message never reaches the classifier
+    assert stats.leads_created == 1
+
+    lead = db.execute(select(Lead)).scalar_one()
+    older_message = db.execute(
+        select(EmailMessage).where(EmailMessage.gmail_message_id == "m-older")
+    ).scalar_one()
+    newer_message = db.execute(
+        select(EmailMessage).where(EmailMessage.gmail_message_id == "m-newer")
+    ).scalar_one()
+    # Compare against the DB-round-tripped values (not a fresh _parse_internal_date() call)
+    # since Postgres converts an aware UTC datetime to naive-local on the way in.
+    assert lead.received_at == older_message.received_at
+    assert lead.received_at != newer_message.received_at
+
+
+def test_interview_event_created_for_new_lead(db, monkeypatch):
+    msg = _make_full_message(
+        "m1", "t1", 100, "Interview confirmed", "recruiter@greenhouse.io", "Let's meet."
+    )
+    messages = _FakeMessagesResource({"m1": msg}, {"messages": [{"id": "m1"}]})
+    history = _FakeHistoryResource({"history": []})
+    monkeypatch.setattr(
+        sync_module, "get_gmail_service", lambda: _FakeGmailService(messages, history)
+    )
+    monkeypatch.setattr(
+        sync_module,
+        "classify_email",
+        lambda **kwargs: EmailClassification(
+            is_job_lead=True,
+            company="Acme",
+            role_title="Eng",
+            location="Remote",
+            location_ok=True,
+            interview_mentioned=True,
+            interview_datetime="2026-09-25T14:00:00-04:00",
+            interview_type="phone_screen",
+            interview_location_or_link="https://zoom.us/j/12345",
+            interview_confidence=0.9,
+            confidence=0.95,
+            reason="Phone screen confirmed for Sep 25 at 2pm ET.",
+        ),
+    )
+
+    stats = sync_module.run_once()
+
+    assert stats.interview_events_created == 1
+    event = db.execute(select(InterviewEvent)).scalar_one()
+    assert event.event_type == "phone_screen"
+    assert event.location_or_link == "https://zoom.us/j/12345"
+    assert event.source == "gmail_parsed"
+    lead = db.execute(select(Lead)).scalar_one()
+    assert event.lead_id == lead.id
+
+
+def test_interview_event_attached_to_existing_lead_from_ambiguous_reply(db, monkeypatch):
+    # First message creates the lead. Second message (a short reply that doesn't look like
+    # a job lead on its own) still carries a confirmed interview date and should attach to
+    # the thread's already-existing lead, not be dropped for lacking its own is_job_lead=true.
+    first = _make_full_message(
+        "m1", "t1", 100, "Interview opportunity", "recruiter@greenhouse.io", "Interested?"
+    )
+    second = _make_full_message(
+        "m2", "t1", 101, "Re: Interview opportunity", "recruiter@greenhouse.io", "Confirmed for Thursday."
+    )
+    messages = _FakeMessagesResource(
+        {"m1": first, "m2": second}, {"messages": [{"id": "m1"}, {"id": "m2"}]}
+    )
+    history = _FakeHistoryResource({"history": []})
+    monkeypatch.setattr(
+        sync_module, "get_gmail_service", lambda: _FakeGmailService(messages, history)
+    )
+
+    def _fake_classify(*, subject, from_addr, body_text):
+        if subject.startswith("Re:"):
+            return EmailClassification(
+                is_job_lead=False,
+                interview_mentioned=True,
+                interview_datetime="2026-09-25T14:00:00-04:00",
+                interview_type="call",
+                interview_confidence=0.85,
+                confidence=0.4,
+                reason="Short confirmation reply, not independently a job lead.",
+            )
+        return EmailClassification(
+            is_job_lead=True,
+            company="Acme",
+            role_title="Eng",
+            location="Remote",
+            location_ok=True,
+            confidence=0.9,
+            reason="Recruiter outreach.",
+        )
+
+    monkeypatch.setattr(sync_module, "classify_email", _fake_classify)
+
+    stats = sync_module.run_once()
+
+    assert stats.leads_created == 1
+    assert stats.interview_events_created == 1
+    lead = db.execute(select(Lead)).scalar_one()
+    event = db.execute(select(InterviewEvent)).scalar_one()
+    assert event.lead_id == lead.id
+    assert event.event_type == "call"
+
+
+def test_interview_event_dedup_same_datetime(db, monkeypatch):
+    first = _make_full_message(
+        "m1", "t1", 100, "Interview invite", "recruiter@greenhouse.io", "Invite attached."
+    )
+    second = _make_full_message(
+        "m2", "t1", 101, "Re: Interview invite", "recruiter@greenhouse.io", "Confirmed!"
+    )
+    messages = _FakeMessagesResource(
+        {"m1": first, "m2": second}, {"messages": [{"id": "m1"}, {"id": "m2"}]}
+    )
+    history = _FakeHistoryResource({"history": []})
+    monkeypatch.setattr(
+        sync_module, "get_gmail_service", lambda: _FakeGmailService(messages, history)
+    )
+    monkeypatch.setattr(
+        sync_module,
+        "classify_email",
+        lambda **kwargs: EmailClassification(
+            is_job_lead=True,
+            company="Acme",
+            role_title="Eng",
+            location="Remote",
+            location_ok=True,
+            interview_mentioned=True,
+            interview_datetime="2026-09-25T14:00:00-04:00",
+            interview_type="call",
+            interview_confidence=0.9,
+            confidence=0.9,
+            reason="Same interview mentioned twice.",
+        ),
+    )
+
+    stats = sync_module.run_once()
+
+    assert stats.interview_events_created == 1  # not 2 -- same lead, same datetime
+    events = db.execute(select(InterviewEvent)).scalars().all()
+    assert len(events) == 1
+
+
+def test_interview_event_skipped_below_confidence(db, monkeypatch):
+    msg = _make_full_message(
+        "m1", "t1", 100, "Interview maybe", "recruiter@greenhouse.io", "Maybe Thursday?"
+    )
+    messages = _FakeMessagesResource({"m1": msg}, {"messages": [{"id": "m1"}]})
+    history = _FakeHistoryResource({"history": []})
+    monkeypatch.setattr(
+        sync_module, "get_gmail_service", lambda: _FakeGmailService(messages, history)
+    )
+    monkeypatch.setattr(
+        sync_module,
+        "classify_email",
+        lambda **kwargs: EmailClassification(
+            is_job_lead=True,
+            company="Acme",
+            role_title="Eng",
+            location="Remote",
+            location_ok=True,
+            interview_mentioned=True,
+            interview_datetime="2026-09-25T14:00:00-04:00",
+            interview_type="call",
+            interview_confidence=0.4,
+            confidence=0.9,
+            reason="Vague, low-confidence date mention.",
+        ),
+    )
+
+    stats = sync_module.run_once()
+
+    assert stats.leads_created == 1
+    assert stats.interview_events_created == 0
+    assert db.execute(select(InterviewEvent)).scalar_one_or_none() is None

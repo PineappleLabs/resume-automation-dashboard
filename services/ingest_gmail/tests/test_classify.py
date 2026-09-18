@@ -100,3 +100,52 @@ def test_classify_email_wrong_location(monkeypatch):
 
     assert result.is_job_lead is True
     assert result.location_ok is False
+
+
+def test_classify_email_extracts_interview_datetime(monkeypatch):
+    payload = {
+        "is_job_lead": True,
+        "company": "Acme Corp",
+        "role_title": "Backend Engineer",
+        "location": "Remote",
+        "location_ok": True,
+        "interview_mentioned": True,
+        "interview_datetime": "2026-09-25T14:00:00-04:00",
+        "interview_type": "phone_screen",
+        "interview_location_or_link": "https://zoom.us/j/12345",
+        "interview_confidence": 0.9,
+        "confidence": 0.95,
+        "reason": "Recruiter confirmed a phone screen for Sep 25 at 2pm ET.",
+    }
+    monkeypatch.setattr(classify_module.anthropic, "Anthropic", _FakeAnthropic(payload))
+
+    result = classify_email(
+        subject="Phone screen confirmed",
+        from_addr="recruiter@acme.com",
+        body_text="Let's do a phone screen Thursday Sep 25 at 2pm ET. Zoom: https://zoom.us/j/12345",
+    )
+
+    assert result.interview_mentioned is True
+    assert result.interview_datetime == "2026-09-25T14:00:00-04:00"
+    assert result.interview_type == "phone_screen"
+    assert result.interview_location_or_link == "https://zoom.us/j/12345"
+    assert result.interview_confidence == 0.9
+
+
+def test_classify_email_no_interview_defaults_false(monkeypatch):
+    payload = {
+        "is_job_lead": True,
+        "company": "Acme Corp",
+        "role_title": "Backend Engineer",
+        "location": "Remote",
+        "location_ok": True,
+        "confidence": 0.9,
+        "reason": "Initial recruiter outreach, no scheduling yet.",
+    }
+    monkeypatch.setattr(classify_module.anthropic, "Anthropic", _FakeAnthropic(payload))
+
+    result = classify_email(subject="Hi", from_addr="recruiter@acme.com", body_text="Interested?")
+
+    assert result.interview_mentioned is False
+    assert result.interview_datetime is None
+    assert result.interview_confidence == 0.0

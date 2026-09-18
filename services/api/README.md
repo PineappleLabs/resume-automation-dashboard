@@ -25,7 +25,10 @@ shared with the ingestion worker.
    psql -U postgres -h localhost -c "CREATE DATABASE jobsearch_test OWNER jobsearch_app;"
    ```
 
-3. Create the venv and install this package, `jobsearch_db`, and `resume_pipeline` (all editable):
+3. Create the venv and install this package, `jobsearch_db`, `resume_pipeline`, and
+   `ingest_gmail` (all editable — the last one is needed for the dashboard's "Refresh from
+   Gmail" button, which calls `ingest_gmail.sync.run_once()` in-process; see
+   [`services/ingest_gmail/README.md`](../ingest_gmail/README.md) for its own OAuth setup):
 
    ```powershell
    py -3.12 -m venv services\api\.venv
@@ -33,6 +36,7 @@ shared with the ingestion worker.
    pip install -e services\api
    pip install -e packages\jobsearch_db
    pip install -e packages\resume_pipeline
+   pip install -e services\ingest_gmail
    ```
 
 4. Copy `.env.example` to `.env` and fill in `SESSION_SECRET_KEY` (e.g.
@@ -56,8 +60,13 @@ Visit `http://127.0.0.1:8000`, log in with `DASHBOARD_PASSWORD`.
 
 - Manual "quick-add" leads (company, role, JD text), plus leads ingested automatically from
   Gmail by `services/ingest_gmail` (`source='gmail'`) — LinkedIn ingestion is still later.
+- **Refresh from Gmail** button on the leads list — runs a sync pass on demand (in-process,
+  blocking, same as `ingest-gmail run-once`) instead of waiting for a scheduled poll; result
+  summary shown via a redirect + query-string flash message (`/leads?gmail_total=...`).
 - Status tracking with a full history (`status_history`), interview event scheduling
-  (`interview_events`), leads list sorted by soonest upcoming event.
+  (`interview_events` — manually added, or auto-added from a parsed Gmail date with
+  `source='gmail_parsed'`, tagged "from Gmail" in the list), leads list sorted by soonest
+  upcoming event.
 - **Tailor** button on a lead's detail page calls `resume_pipeline.service.tailor_lead()`
   in-process (same pipeline the CLI uses, same `packages/resume_pipeline/jobs/<slug>/`
   output directory) and serves the resulting PDF.
