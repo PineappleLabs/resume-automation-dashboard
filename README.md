@@ -4,6 +4,11 @@ This repo started as a standalone resume-tailoring CLI and is growing into a job
 automation platform: Gmail/LinkedIn lead ingestion, a tracking dashboard, and an AI-assisted
 application agent, all built on top of the same tailoring pipeline.
 
+See [`docs/planning/job-search-platform-plan.md`](docs/planning/job-search-platform-plan.md)
+for the architecture and current-state summary, and
+[`docs/planning/TODO.md`](docs/planning/TODO.md) for the remaining-work checklist
+(LinkedIn ingestion, reply drafts, Gmail send, the auto-apply agent, deployment, ...).
+
 ## Layout
 
 - [`packages/resume_pipeline/`](packages/resume_pipeline/README.md) — the resume tailoring

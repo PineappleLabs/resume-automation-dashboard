@@ -86,4 +86,4 @@ never touch `jobsearch` or `services/api/.env`.
 ## Not built yet
 
 LinkedIn ingestion, reply drafts, the auto-apply agent, and Docker/homelab deployment — see
-the plan doc's phased rollout.
+[`docs/planning/TODO.md`](../../docs/planning/TODO.md) for the full checklist.

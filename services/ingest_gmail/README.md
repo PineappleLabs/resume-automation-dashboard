@@ -114,4 +114,5 @@ mailbox aren't covered by these tests — they need a human at the keyboard.
 
 Reply-monitoring / auto status updates (interview *dates* are auto-detected — see above —
 but a reply doesn't change `Lead.status`), `.ics` calendar-attachment parsing, Gmail send,
-LinkedIn ingestion, the auto-apply agent, Docker/infra, unattended scheduling.
+LinkedIn ingestion, the auto-apply agent, Docker/infra, unattended scheduling. Full checklist:
+[`docs/planning/TODO.md`](../../docs/planning/TODO.md).

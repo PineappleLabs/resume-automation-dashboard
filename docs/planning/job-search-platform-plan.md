@@ -1,9 +1,40 @@
 # Job-Search Automation Platform — Implementation Plan
 
-> Status: **Phase 0 complete** (see [Phased rollout](#phased-rollout) below). This is the
-> plan drafted before Phase 0's restructuring; file paths in the "Critical files" section
-> refer to the pre-restructure layout (`src/...`) and now live under
+> Status: **Phases 0–1 complete**, plus a slice of Phase 2 pulled forward. See
+> [Current state](#current-state) for what's live today and
+> [`docs/planning/TODO.md`](TODO.md) for the actionable remaining-work checklist. This doc's
+> [Phased rollout](#phased-rollout) section is the detailed build log; file paths in the
+> "Critical files" section refer to the pre-restructure layout (`src/...`), now under
 > `packages/resume_pipeline/resume_pipeline/...`.
+
+## Current state (2026-09-17)
+
+**Live and working**, all verified against real data (not just tests):
+
+- **`packages/resume_pipeline`** — the original CLI (`tailor`/`render`/`master`/`inventory`/
+  `verify-ats`), unchanged, still works standalone.
+- **`packages/jobsearch_db`** — shared SQLAlchemy models + the one Alembic migration
+  history (`leads`, `status_history`, `interview_events`, `email_threads`,
+  `email_messages`), used by both services below.
+- **`services/api`** — the dashboard. Login, manual "quick-add" leads, status tracking with
+  full history, interview event scheduling (manual or auto-parsed from Gmail), a **Tailor**
+  button (real Claude call → PDF, in-process), and a **Refresh from Gmail** button that runs
+  a sync pass on demand.
+- **`services/ingest_gmail`** — Gmail ingestion. OAuth (one-time interactive `authorize`,
+  silent refresh after), incremental sync with a full-resync fallback, a cheap rule
+  prefilter before the LLM classifier (cost control), the classifier itself (job-lead
+  detection + company/role extraction + **location filtering** — only Atlanta, GA or fully
+  remote, per the user's requirement — + **interview-date extraction** from message text),
+  idempotent re-runs, `run-once`/`poll`/`authorize` CLI commands.
+- Everything runs **natively on Windows**, no Docker: native PostgreSQL 17 service, four
+  independent venvs (one per package/service), each installing the others it needs as
+  editable local packages.
+- 44 automated tests across the four packages, plus everything above has been exercised
+  against the user's real mailbox and real dashboard, not just test fakes.
+
+**Not built yet** — see [`docs/planning/TODO.md`](TODO.md) for the full breakdown:
+auto status-updates from reply content, reply drafts, Gmail send, `.ics` calendar-attachment
+parsing, LinkedIn ingestion, the auto-apply agent, and any Docker/homelab deployment.
 
 ## Context
 
@@ -26,37 +57,41 @@ Key decisions already made with the user, driving the design below:
 
 Single monorepo, Python-first (matches the existing pipeline), Postgres-backed, no message broker — a solo homelab project doesn't need Redis/Celery; APScheduler polling loops plus a Postgres-backed run table cover every async need here.
 
+This tree is now the **as-built** layout, not the original pre-implementation sketch —
+`packages/jobsearch_db` didn't exist in the original plan (extracted once `ingest_gmail`
+became a second consumer of `services/api`'s models); there's no root `pyproject.toml`
+(each package/service has its own venv, installing the others it needs as editable local
+packages — see each README); nothing is Dockerized yet. `✅` = built, `⬜` = still planned.
+
 ```
-resume/                                  (git init here; becomes the monorepo root)
-├── pyproject.toml
+resume-automation-dashboard/
 ├── packages/
-│   └── resume_pipeline/                 (today's src/, packaged with minimal changes)
-│       ├── resume_pipeline/
-│       │   ├── cli.py                   (existing click CLI — unchanged behavior)
-│       │   ├── schema.py  select.py  fit.py  render.py  import_linkedin.py
-│       │   └── service.py               (NEW: tailor_lead() facade the API/agent call)
-│       ├── content/content.yaml
-│       ├── templates/
-│       └── tests/                       (NEW pytest suite — none exist today)
+│   ├── resume_pipeline/          ✅ the original CLI, unchanged (select → fit → render)
+│   │   ├── resume_pipeline/{cli,schema,select,fit,render,service,import_linkedin}.py
+│   │   ├── content/content.yaml
+│   │   └── tests/
+│   └── jobsearch_db/              ✅ shared models + the one Alembic migration history
+│       ├── jobsearch_db/{config,db,models}.py
+│       └── alembic/versions/      (0001 initial schema, 0002 email ingestion, 0003 location)
 ├── services/
-│   ├── api/                             (FastAPI backend + dashboard)
+│   ├── api/                       ✅ FastAPI + Jinja2/HTMX dashboard
 │   │   ├── app/main.py
-│   │   ├── app/models.py                (SQLAlchemy: Lead, StatusHistory, EmailThread,
-│   │   │                                  EmailMessage, LinkedInMessage, Application, AgentRun)
-│   │   ├── app/routers/{leads,applications,agent_runs}.py
-│   │   ├── app/classify.py              (shared LLM classifier used by both ingestion workers)
-│   │   ├── app/templates/                (Jinja2 + HTMX dashboard)
-│   │   ├── alembic/
-│   │   └── Dockerfile
-│   ├── ingest_gmail/       (worker.py, gmail_client.py, Dockerfile)
-│   ├── ingest_linkedin/    (worker.py, linkedin_session.py, Dockerfile)
-│   └── autoapply_agent/    (worker.py, browser_agent.py, tools.py, Dockerfile)
-├── infra/
-│   ├── docker-compose.yml               (local/dev)
-│   ├── docker-compose.prod.yml          (bigpineapple overrides: swag-network external, no host ports, watchtower-exclude label)
-│   ├── swag/jobsearch.subdomain.conf    (kept for reference/VPN-internal routing; no public DNS)
-│   └── .env.example per service (no single global .env)
-└── jobs/  →  shared Docker volume mounted at /data/jobs in every service
+│   │   ├── app/routers/{auth,leads,interview_events,tailor,gmail}.py
+│   │   ├── app/templates/         (server-rendered, HTMX partials, no build step)
+│   │   ├── app/{config,db,models,security,slugs}.py  (db/models are re-export shims
+│   │   │                                               onto jobsearch_db)
+│   │   └── tests/
+│   ├── ingest_gmail/               ✅ OAuth + sync + classifier + CLI
+│   │   ├── ingest_gmail/{config,gmail_auth,prefilter,classify,sync,scheduler,cli,slugs}.py
+│   │   ├── secrets/                (gitignored: client_secret.json, token.json)
+│   │   └── tests/
+│   ├── ingest_linkedin/            ⬜ not started (Phase 3)
+│   └── autoapply_agent/            ⬜ not started (Phase 4)
+├── infra/                          ⬜ empty — Docker Compose + SWAG proxy-conf for the
+│                                       homelab deployment, once a phase is ready to ship
+└── docs/planning/
+    ├── job-search-platform-plan.md  (this file — architecture + build log)
+    └── TODO.md                      (actionable remaining-work checklist)
 ```
 
 **Data flow**: Gmail/LinkedIn workers poll → shared LLM classifier tags job-lead vs. not → upsert into Postgres `leads` → dashboard lists leads → user clicks **Tailor** → API calls `resume_pipeline.service.tailor_lead()` (same `select_for_job` → `fit_to_one_page` → `render_and_compile` pipeline, untouched) → PDF lands in `/data/jobs/<slug>/` → user clicks **Apply Now** with a target URL → `autoapply_agent` re-tailors if needed, drives Playwright + Claude tool-use to fill the form, **stops before submit**, writes a field/screenshot snapshot → dashboard shows an Application Preview → user clicks **Confirm & Submit** → agent performs only that final click.
@@ -68,35 +103,45 @@ resume/                                  (git init here; becomes the monorepo ro
 - **Server-rendered Jinja2 + HTMX (+ light Alpine.js)** for the dashboard, not a separate React/Vite app: this is an internal single-user CRUD/status tool, the repo already uses Jinja2 for the resume template, and it avoids a second build toolchain. A richer SPA is the natural upgrade path later if needed, not now.
 - **Playwright + a bespoke Claude tool-use loop** (not generic desktop computer-use) for both LinkedIn scraping and auto-apply: form-filling is DOM-addressable and structured; a tool-use loop over the page's accessibility tree is more precise and far easier to run unattended headless in a container than full computer-use.
 
-## Data model (sketch)
+## Data model
 
-- `leads(id, company, role_title, source[gmail|linkedin|manual], source_ref, jd_text, jd_url, recruiter_name, recruiter_contact, received_at, status[new|tailoring|tailored|applied|interviewing|rejected|offer|withdrawn|archived], resume_job_slug, created_at, updated_at)`
-- `status_history(id, lead_id, old_status, new_status, changed_by[system|user|agent], confidence, reason, changed_at)` — append-only audit trail.
-- `email_threads(id, lead_id nullable, gmail_thread_id, gmail_history_id, last_message_id, last_synced_at)` — the `history_id` cursor enables incremental Gmail sync.
-- `email_messages(id, thread_id, gmail_message_id UNIQUE, from_addr, subject, body_text, received_at, direction, classification, classification_confidence)`
-- `linkedin_messages(id, lead_id nullable, conversation_id, sender_name, message_text, received_at, scraped_at)`
-- `applications(id, lead_id, target_url, status[draft|awaiting_confirmation|submitted|failed], resume_pdf_path, form_field_snapshot JSONB, agent_run_id, submitted_at)`
-- `agent_runs(id, kind[auto_apply|gmail_poll|linkedin_poll], lead_id nullable, status, started_at, finished_at, log_ref)`
-- `interview_events(id, lead_id, scheduled_at, type[phone_screen|technical|onsite|call|other], location_or_link, notes, source[manual|gmail_parsed], created_at, updated_at)` — a lead can have several (screen → onsite → offer call); the dashboard's main lead list sorts by `MIN(scheduled_at)` across each lead's future events, soonest first, with leads that have none sorting last.
-- `reply_drafts(id, lead_id, channel[email|linkedin], subject, body_text, resume_pdf_path, status[draft|sent|dismissed], created_at, sent_at)` — one per tailoring run against a recruiter/LinkedIn-sourced lead.
+Tables marked ✅ exist today in `packages/jobsearch_db` (see its migrations for the exact,
+current column list — this section is no longer the source of truth for those, just a
+summary). Tables marked ⬜ are still just this sketch, not built.
 
-PDFs/artifacts stay on disk under `/data/jobs/<slug>/...` (matching today's pipeline); the DB stores metadata and pointers only.
+- ✅ `leads(id, company, role_title, source[gmail|linkedin|manual], source_ref, jd_text, jd_url, recruiter_name, recruiter_contact, received_at, status[new|tailoring|tailored|applied|interviewing|rejected|offer|withdrawn|archived], resume_job_slug, created_at, updated_at)`
+- ✅ `status_history(id, lead_id, old_status, new_status, changed_by[system|user|agent], confidence, reason, changed_at)` — append-only audit trail. `changed_by='system'` is used today (Gmail-sourced lead creation); the *auto-update from reply content* behavior described under Gmail ingestion below is not built yet — today only lead *creation* writes a system row, not later status transitions.
+- ✅ `email_threads(id, lead_id nullable, gmail_thread_id, gmail_history_id, last_message_id, last_synced_at)` — the `history_id` cursor enables incremental Gmail sync. `lead_id` is `ON DELETE SET NULL`, not `CASCADE` — ingestion history outlives a deleted lead.
+- ✅ `email_messages(id, thread_id, gmail_message_id UNIQUE, from_addr, subject, body_text, received_at, direction, classification, classification_confidence, location, location_ok)` — `location`/`location_ok` (migration `0003`) weren't in the original sketch; added when the user asked for Atlanta-or-remote filtering, so a rejected-by-location message is still visible in the data even with no `Lead` row.
+- ✅ `interview_events(id, lead_id, scheduled_at, type[phone_screen|technical|onsite|call|other], location_or_link, notes, source[manual|gmail_parsed], created_at, updated_at)` — a lead can have several (screen → onsite → offer call); the dashboard's main lead list sorts by `MIN(scheduled_at)` across each lead's future events, soonest first, with leads that have none sorting last. `source='gmail_parsed'` rows are created automatically today from interview dates the classifier finds in message text (deduplicated per lead+exact-time); `.ics` calendar-attachment parsing is not implemented.
+- ⬜ `linkedin_messages(id, lead_id nullable, conversation_id, sender_name, message_text, received_at, scraped_at)` — Phase 3.
+- ⬜ `applications(id, lead_id, target_url, status[draft|awaiting_confirmation|submitted|failed], resume_pdf_path, form_field_snapshot JSONB, agent_run_id, submitted_at)` — Phase 4.
+- ⬜ `agent_runs(id, kind[auto_apply|gmail_poll|linkedin_poll], lead_id nullable, status, started_at, finished_at, log_ref)` — Phase 4 (Gmail/LinkedIn polling itself doesn't use this table today — no run-history/audit table exists yet for `ingest_gmail`, it just logs to stdout).
+- ⬜ `reply_drafts(id, lead_id, channel[email|linkedin], subject, body_text, resume_pdf_path, status[draft|sent|dismissed], created_at, sent_at)` — one per tailoring run against a recruiter/LinkedIn-sourced lead. Phase 2.
+
+PDFs/artifacts stay on disk under `packages/resume_pipeline/jobs/<slug>/...` today (matching
+the original pipeline; the `/data/jobs/...` Docker-volume path below is for after
+deployment). The DB stores metadata and pointers only.
 
 ## Gmail ingestion
 
+All bullets below are ✅ built (`services/ingest_gmail`) except where marked otherwise.
+
 - **Gmail API**, not IMAP — `users.history.list` gives the incremental-sync cursor (`email_threads.gmail_history_id`) needed to catch replies on existing threads without re-scanning the mailbox. Gmail expires history after ~7 days idle, so the worker needs a fallback full-resync (`users.messages.list?q=newer_than:Nd`) when a stored cursor goes stale.
 - **OAuth**: Desktop/Installed-App client, one-time interactive consent, refresh token stored on-box with restricted permissions. Kept in Google's "Testing" publishing status to skip app verification — flagged as a risk below since `gmail.readonly` is a sensitive scope and unverified-app refresh-token lifetime policy should be re-checked at implementation time.
-- **Classification**: cheap rule prefilter (known ATS/recruiter domains, subject keywords) to cut volume, then an LLM forced-tool-call classifier (`classify_email` tool) — same pattern already proven in `src/select.py` — returning `{is_job_lead, company, role_title, confidence}`.
-- **Reply/status monitoring**: inbound messages on a thread already linked to a lead get classified for status-change signal (rejection/interview/offer language). High-confidence transitions auto-append to `status_history`; low-confidence ones surface in the dashboard for manual confirmation instead of silently changing status.
+- **Classification**: cheap rule prefilter (known ATS/recruiter domains, subject keywords) to cut volume, then an LLM forced-tool-call classifier (`classify_email` tool) returning `{is_job_lead, company, role_title, confidence, location, location_ok, interview_mentioned, interview_datetime, interview_type, interview_location_or_link, interview_confidence, reason}` — location and interview-date fields were added after this section was first drafted, per later user requests (see Phase 1's build log below).
+- **Location filtering**: only creates a `Lead` when the extracted location satisfies a configurable `TARGET_LOCATION_DESCRIPTION` (default "Atlanta, Georgia, or fully remote") in addition to the `is_job_lead`/confidence checks.
+- **Interview-date extraction**: a confidence-gated match creates an `interview_events(source='gmail_parsed')` row on the thread's lead. Only looks at the single message being analyzed (not full thread context) and doesn't parse `.ics` attachments — see TODO.
+- ⬜ **Reply/status monitoring** (Phase 2, not built): inbound messages on a thread already linked to a lead get classified for status-change signal (rejection/interview/offer language). High-confidence transitions auto-append to `status_history`; low-confidence ones surface in the dashboard for manual confirmation instead of silently changing status. Today, a lead's `status` only ever changes via the dashboard's manual status-update form — Gmail replies are ingested (and can add interview events) but never change `status`.
 
-## LinkedIn ingestion
+## LinkedIn ingestion ⬜ not started (Phase 3)
 
 - Playwright `launch_persistent_context` against a volume-mounted profile dir, logged in **once** interactively to survive 2FA/checkpoints (e.g. a brief noVNC session over the VPN, or copying a `storage_state.json` produced locally via SCP).
 - Headless polling a few times/day via APScheduler; `xvfb` as a fallback if headless detection triggers a challenge; randomized timing/jitter.
 - Extraction: walk Messaging, pull sender/text/timestamp/profile-URL per conversation, store to `linkedin_messages`, run through the same shared classifier module as Gmail, upsert into `leads`.
 - Ban-risk mitigation: one real account doing both manual and automated activity — throttle aggressively, ship a kill-switch env var to instantly disable ingestion if LinkedIn issues any warning, and keep a manual "quick-add lead" path in the dashboard as a fallback if ingestion ever gets throttled or banned.
 
-## Auto-apply agent
+## Auto-apply agent ⬜ not started (Phase 4)
 
 1. User clicks **Apply Now** with a lead + target URL → API inserts `applications(status=draft)` + `agent_runs(status=queued)`.
 2. Worker picks up the run and **first re-invokes the unchanged existing pipeline** (`resume_pipeline.service.tailor_lead()`) to produce/refresh the tailored PDF for this specific posting.
@@ -107,9 +152,9 @@ PDFs/artifacts stay on disk under `/data/jobs/<slug>/...` (matching today's pipe
 
 ## Reply drafting & interview scheduling
 
-**Reply drafts.** `resume_pipeline.service.tailor_lead()` gains a second output for `source in {gmail, linkedin}` leads: alongside the tailored PDF, it makes one more Anthropic call (same forced-tool-call style as `select_for_job`, e.g. a `draft_reply` tool) that takes the recruiter's message text + the tailored `Selection` and returns a `{subject, body_text}` reply — channel-appropriate (an email with a greeting/sign-off and PDF-attachment framing for Gmail leads, a shorter message body for LinkedIn leads). This is stored as a `reply_drafts` row and shown on the lead's dashboard page next to the resume PDF, editable before use. **Sending is a separate, explicit, human-confirmed action** — same posture as auto-apply's submit gate: for `channel=email` the dashboard can offer a "Send via Gmail" button that calls `users.messages.send` with the tailored PDF attached and the thread's `In-Reply-To`/`References` headers set so it lands correctly in the existing thread, but only on click, never automatically; for `channel=linkedin` the draft is copy-to-clipboard only in an early phase (sending a LinkedIn message via Playwright is a further automation step, deliberately deferred past Phase 3's read-only scraping to keep ban risk contained). `reply_drafts.status` moves `draft → sent` only once the user-confirmed send actually completes.
+**Reply drafts.** ⬜ Not built (Phase 2). `resume_pipeline.service.tailor_lead()` gains a second output for `source in {gmail, linkedin}` leads: alongside the tailored PDF, it makes one more Anthropic call (same forced-tool-call style as `select_for_job`, e.g. a `draft_reply` tool) that takes the recruiter's message text + the tailored `Selection` and returns a `{subject, body_text}` reply — channel-appropriate (an email with a greeting/sign-off and PDF-attachment framing for Gmail leads, a shorter message body for LinkedIn leads). This is stored as a `reply_drafts` row and shown on the lead's dashboard page next to the resume PDF, editable before use. **Sending is a separate, explicit, human-confirmed action** — same posture as auto-apply's submit gate: for `channel=email` the dashboard can offer a "Send via Gmail" button that calls `users.messages.send` with the tailored PDF attached and the thread's `In-Reply-To`/`References` headers set so it lands correctly in the existing thread, but only on click, never automatically; for `channel=linkedin` the draft is copy-to-clipboard only in an early phase (sending a LinkedIn message via Playwright is a further automation step, deliberately deferred past Phase 3's read-only scraping to keep ban risk contained). `reply_drafts.status` moves `draft → sent` only once the user-confirmed send actually completes.
 
-**Interview/call scheduling.** `interview_events` rows are created two ways: (1) manually from the dashboard when the user schedules something themselves, and (2) opportunistically parsed out of classified Gmail replies — the same reply-classification step used for status updates (`Phase 2`) also checks for scheduling language/calendar-invite attachments (`.ics` parsing) and proposes an event with `source=gmail_parsed`, surfaced for one-click confirm rather than silently added (same confidence-gated pattern as status transitions, to avoid a misread email creating a phantom interview). The main dashboard lead list has a "Next event" column and a default sort by soonest upcoming `interview_events.scheduled_at`, so the leads needing the most immediate attention surface first.
+**Interview/call scheduling.** ✅ Partially built. `interview_events` rows are created two ways today: (1) manually from the dashboard, and (2) automatically from Gmail — `classify_email()` extracts a mentioned interview date/time from the single message being analyzed (in the same call as job-lead classification, not a separate reply-monitoring pass) and creates an event with `source=gmail_parsed` directly when confidence clears a threshold, **no one-click-confirm step** (a deliberate simplification from this section's original design, at the user's request — they wanted leads updated automatically, not queued for review; revisit if auto-created events turn out to be noisy in practice). Not yet built: checking scheduling language/dates across a whole thread's context rather than one message at a time, and `.ics` calendar-invite attachment parsing. The main dashboard lead list has a "Next event" column and a default sort by soonest upcoming `interview_events.scheduled_at`, so the leads needing the most immediate attention surface first.
 
 ## Secrets & security
 
@@ -221,15 +266,17 @@ PDFs/artifacts stay on disk under `/data/jobs/<slug>/...` (matching today's pipe
 
 ## Verification approach per phase
 
-- **Phase 0** ✅: ran existing `tailor`/`render`/`inventory` CLI commands inside the new Docker image (built and run on `bigpineapple`) and diffed the output against host-produced output; ran the new pytest suite.
-- **Phase 1**: point `ingest_gmail` at a Gmail label seeded with a few real/sample recruiter emails, confirm leads appear correctly classified in the dashboard, confirm the Tailor button reproduces Phase-0-equivalent output.
-- **Phase 2**: manually reply to a test thread with rejection/interview-style language and confirm `status_history` updates (or flags for review) as expected.
-- **Phase 3**: run `ingest_linkedin` against the user's real LinkedIn inbox in a monitored/manual first run, confirm extracted leads match reality before trusting the scheduled poll.
-- **Phase 4**: dry-run the auto-apply agent against a throwaway/test application form first, confirm it reliably stops at `awaiting_confirmation` with an accurate field snapshot before ever pointing it at a real job posting.
+- **Phase 0** ✅ done: ran existing `tailor`/`render`/`inventory` CLI commands (both in the original Docker image on `bigpineapple`, and later natively on Windows) and diffed output; pytest suite (7/7).
+- **Phase 1** ✅ done: `ingest_gmail` run against the user's real mailbox (not just a seeded test label) — leads correctly classified, correctly filtered by location, Tailor button reproduces Phase-0-equivalent PDF output from a Gmail-sourced lead. 44 automated tests across all four packages.
+- **Phase 2** (partially done — interview-date extraction, not yet status monitoring): remaining verification once built — manually reply to a test thread with rejection/interview-style language and confirm `status_history` updates (or flags for review) as expected.
+- **Phase 3** (not started): run `ingest_linkedin` against the user's real LinkedIn inbox in a monitored/manual first run, confirm extracted leads match reality before trusting the scheduled poll.
+- **Phase 4** (not started): dry-run the auto-apply agent against a throwaway/test application form first, confirm it reliably stops at `awaiting_confirmation` with an accurate field snapshot before ever pointing it at a real job posting.
 
 ### Critical files (pre-Phase-0 paths; now under `packages/resume_pipeline/resume_pipeline/`)
-- `select.py` — forced tool-call pattern to reuse for email/LinkedIn classification.
-- `render.py` — Tectonic invocation, now containerized (`_find_tectonic`).
+- `select.py` — forced tool-call pattern, already reused once for
+  `services/ingest_gmail/ingest_gmail/classify.py` (Gmail classification); reuse again for
+  LinkedIn classification and `draft_reply` when those get built.
+- `render.py` — Tectonic invocation (`_find_tectonic`, auto-detects `%LOCALAPPDATA%\tectonic\` on Windows or `PATH`); still runs natively, not containerized yet.
 - `fit.py` — one-page trimming logic, wrapped unchanged by `service.py`.
-- `cli.py` — orchestration now shared with `service.py`'s `tailor_lead()`.
-- `schema.py` — Pydantic models to extend for the new SQLAlchemy schema.
+- `cli.py` — orchestration now shared with `service.py`'s `tailor_lead()`, which both `services/api`'s Tailor button and `services/ingest_gmail`'s slug assignment now call into directly.
+- `schema.py` — Pydantic models; `packages/jobsearch_db/jobsearch_db/models.py` is the separate SQLAlchemy schema that resulted (not an extension of this file — different concern, resume content vs. lead tracking).
