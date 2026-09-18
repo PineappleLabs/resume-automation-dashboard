@@ -16,6 +16,7 @@ from .classify import EmailClassification, classify_email
 from .config import settings
 from .gmail_auth import get_gmail_service
 from .prefilter import passes_prefilter
+from .slugs import unique_lead_slug
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ def _upsert_lead(
     )
     db.add(lead)
     db.flush()
+    lead.resume_job_slug = unique_lead_slug(db, lead.company, lead.role_title)
     thread.lead_id = lead.id
     db.add(
         StatusHistory(

@@ -138,6 +138,7 @@ def test_full_resync_when_no_cursor_creates_lead(db, monkeypatch, counting_class
 
     lead = db.execute(select(Lead).where(Lead.source == "gmail")).scalar_one()
     assert lead.company == "Acme Corp"
+    assert lead.resume_job_slug  # tailor_lead() does Path(...) / slug -- must not be None
     thread = db.execute(select(EmailThread).where(EmailThread.gmail_thread_id == "t1")).scalar_one()
     assert thread.gmail_history_id == 100
     assert thread.lead_id == lead.id

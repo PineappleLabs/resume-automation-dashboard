@@ -13,12 +13,15 @@ Phase 1 — reply monitoring, `.ics` parsing, and Gmail send are later passes.
    create an OAuth client of type **Desktop app**. Download the JSON and save it as
    `services/ingest_gmail/secrets/client_secret.json` (gitignored).
 
-2. Venv + install (needs `packages/jobsearch_db` too, for the shared models):
+2. Venv + install (needs `packages/jobsearch_db` for the shared models, and
+   `packages/resume_pipeline` for its `slugify()` helper, used to assign each ingested
+   lead a `resume_job_slug` so the Tailor button works on it):
 
    ```powershell
    py -3.12 -m venv services\ingest_gmail\.venv
    services\ingest_gmail\.venv\Scripts\Activate.ps1
    pip install -e packages\jobsearch_db
+   pip install -e packages\resume_pipeline
    pip install -e services\ingest_gmail
    ```
 
@@ -67,6 +70,9 @@ ingest-gmail poll       # runs continuously, polling every POLL_INTERVAL_MINUTES
   edit in `.env` to change). Every classified message still gets its `location` and
   `location_ok` stored on `email_messages` regardless, so a rejected-by-location lead is
   visible in the data even though no `Lead` row was made for it.
+- **`resume_job_slug`**: assigned via `ingest_gmail/slugs.py` (mirrors
+  `services/api/app/slugs.py`) the moment a `Lead` is created — required for the dashboard's
+  Tailor button, which calls `resume_pipeline.service.tailor_lead()` with it.
 
 ## Testing
 
